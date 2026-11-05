@@ -33,21 +33,21 @@
  *   相对路径的解析基准是 Profile 目录，不是模块 URL —— 这点很关键。
  *
  * 开关（改 Surge 里模块的参数即可，不用改代码）
- *   模块用 #!arguments 暴露 14 个参数，脚本从 $argument 解析：
- *     splash      开屏广告                      1 开 / 0 关
- *     home        首页卡片与图层配置            1 / 0
- *     search      搜索页推广（热词/联想/结果）  1 / 0
- *     nearby      附近页推荐                    1 / 0
- *     route       路线规划与导航内广告          1 / 0
- *     taxi        打车页资源位                  1 / 0
- *     poi         地点详情页推广                1 / 0
- *     profile     我的页面推广                  1 / 0
- *     banner      横幅、AI 推荐、消息盒          1 / 0
- *     tools       工具宫格、转化列表            1 / 0
- *     mock        纯广告接口直接在请求阶段拦截  1 / 0
- *     strict      通用递归清洗（较激进）        1 / 0
- *     poi_strict  地点详情按白名单裁剪（激进）  1 / 0，默认 0
- *     log         输出去广告日志                1 / 0，默认 0
+ *   模块用 #!arguments 暴露 14 个参数，名字是中文，直接在参数界面显示：
+ *     开屏广告      启动图与开屏跳转                  1 开 / 0 关
+ *     首页推广      首页卡片、资源位、图层配置        1 / 0
+ *     搜索推广      热词、联想词、结果页推广          1 / 0
+ *     附近推荐      附近页推荐流与信息流              1 / 0
+ *     路线导航      路线规划、导航中插播、结束页      1 / 0
+ *     打车推广      打车资源位、评价气泡、红点角标    1 / 0
+ *     地点详情      详情页推广、优惠券、酒店门票页    1 / 0
+ *     我的页面      我的页面卡片与活动入口            1 / 0
+ *     横幅消息      横幅、AI 推荐、消息盒              1 / 0
+ *     工具宫格      工具宫格、转化列表                1 / 0
+ *     接口拦截      纯广告接口在请求阶段直接返回 {}   1 / 0
+ *     深层清洗      递归删广告字段（较激进）          1 / 0
+ *     详情裁剪      详情页按白名单裁剪（激进）        1 / 0，默认 0
+ *     输出日志      在请求备注输出命中详情            1 / 0，默认 0
  *   缺省一律按「开」处理（log / poi_strict 除外），所以老配置不会因为
  *   少传参数而失效。
  *
@@ -66,11 +66,33 @@
 
   /* =====================================================================
    * 零、参数开关
-   *   $argument 由模块的 [Script] 条目传入，形如 home=1&taxi=0&log=1。
+   *   $argument 由模块的 [Script] 条目传入，形如
+   *   「开屏广告=1&首页推广=0&输出日志=1」。
    *   用 & 分隔而不是逗号：Surge 的 [Script] 参数本身就是逗号分隔的
    *   key=value，值里再出现逗号会被截断。
    * ===================================================================== */
   var ARG_OFF = { '0': 1, 'false': 1, 'off': 1, 'no': 1 };
+
+  /* 模块里参数名用中文，Surge 参数界面直接显示成「开屏广告」这样的条目；
+   * 脚本内部仍用英文键，便于阅读和分组表维护。
+   * 旧版模块传的是英文键，这里一并认，升级模块后老配置不会失效。 */
+  var ARG_ALIAS = {
+    '开屏广告': 'splash', 'splash': 'splash',
+    '首页推广': 'home', 'home': 'home',
+    '搜索推广': 'search', 'search': 'search',
+    '附近推荐': 'nearby', 'nearby': 'nearby',
+    '路线导航': 'route', 'route': 'route',
+    '打车推广': 'taxi', 'taxi': 'taxi',
+    '地点详情': 'poi', 'poi': 'poi',
+    '我的页面': 'profile', 'profile': 'profile',
+    '横幅消息': 'banner', 'banner': 'banner',
+    '工具宫格': 'tools', 'tools': 'tools',
+    '接口拦截': 'mock', 'mock': 'mock',
+    '深层清洗': 'strict', 'strict': 'strict',
+    '详情裁剪': 'poi_strict', '详情页裁剪': 'poi_strict', 'poi_strict': 'poi_strict',
+    '输出日志': 'log', 'log': 'log'
+  };
+
   var ARGS = {};
   (function parseArgs() {
     var raw = (typeof $argument === 'string' && $argument) || '';
@@ -82,7 +104,9 @@
       if (eq <= 0) continue;
       var k = p.slice(0, eq).replace(/\s+/g, '');
       if (!k) continue;
-      ARGS[k] = p.slice(eq + 1).replace(/\s+/g, '').toLowerCase();
+      /* 未登记的键也原样存下，方便以后加参数时不必改这里 */
+      var key = Object.prototype.hasOwnProperty.call(ARG_ALIAS, k) ? ARG_ALIAS[k] : k;
+      ARGS[key] = p.slice(eq + 1).replace(/\s+/g, '').toLowerCase();
     }
   })();
 
