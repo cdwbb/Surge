@@ -1,5 +1,6 @@
 #!name=高德地图去广告
 #!desc=开屏/首页/搜索/路线/我的/附近/打车去广告。URL 安装，脚本自动缓存。
+#!category=GitHubWBB
 #!arguments=splash:1,home:1,search:1,nearby:1,route:1,taxi:1,poi:1,profile:1,banner:1,tools:1,mock:1,strict:1,poi_strict:0,log:0
 #!arguments-desc=1 开 / 0 关。第 1-10 项按页面：开屏｜首页｜搜索｜附近｜路线｜打车｜详情｜我的｜横幅｜工具；第 11-14 项高级：拦截｜清洗｜激进｜日志
 #
