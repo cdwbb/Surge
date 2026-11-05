@@ -1,6 +1,6 @@
-#!name=高德地图去广告(Open 版)
+#!name=高德地图去广告_open
 #!desc=开屏/首页/搜索/附近/我的/路线/打车/POI详情推广清理。另一套独立实现，带 9 个可调参数；URL 一键导入，脚本从 GitHub 远程拉取并自动缓存，缓存后离线可用；与 _work 版二选一
-#!author=基于 RuCu6/kelee 逻辑重写的另一实现（Open 版）
+#!author=基于 RuCu6/kelee 逻辑重写的另一实现 _open
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Amap.png
 #!category=GitHubWBB
 #!openUrl=https://apps.apple.com/app/id461703208
@@ -19,7 +19,7 @@
 # 注意：与 amap_remove_ads_work.sgmodule（另一套实现）只启用一个，同时开启会重复改写同一响应体。
 #
 # ===== 参数开关 =====
-# 在 Surge「模块 → 高德地图去广告(Open 版) → 参数」里改，1 开 0 关，改完自动重载。
+# 在 Surge「模块 → 高德地图去广告_open → 参数」里改，1 开 0 关，改完自动重载。
 # 参数由 14 条 [Script] 的 argument= 传给脚本，脚本用 $argument 解析。
 # 占位符必须是三层花括号 {{{参数名}}}，中文名同样有效；#!arguments 用「名称:默认值」写法。
 # 注意 argument 的值里绝对不能出现逗号 —— [Script] 参数本身逗号分隔，值里用 & 分隔。
