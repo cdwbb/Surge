@@ -1,6 +1,7 @@
-/* 高德地图去广告(本地版) —— amap_remove_ads_open.js
- * 另一套独立实现：接口清单与清洗策略与 js/amap_remove_ads.js 不同，两份不要同时启用。
- * 供 [Script] 条目以 script-path=amap_remove_ads_open.js 本地引用，不依赖 kelee.one / GitHub 远程源。
+/* 高德地图去广告(Open 版) —— amap_remove_ads_open.js
+ * 另一套独立实现：接口清单与清洗策略与 js/amap_remove_ads.js 不同，两套模块不要同时启用。
+ * 由 amap_remove_ads_open.sgmodule 的 14 条 [Script] 通过 raw URL 远程引用，Surge 自动缓存；
+ * 不依赖 kelee.one，也不需要把本文件下载到本机。
  * 覆盖：开屏 / 首页 / 搜索 / 附近 / 我的 / 路线规划 / 导航 / 打车 / POI 详情页 的推广清理。
  * 原理：对 http-response 的 JSON 按接口分支做字段删减与列表过滤，不阻断正常功能数据。
  */

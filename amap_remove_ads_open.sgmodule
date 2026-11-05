@@ -1,0 +1,65 @@
+#!name=高德地图去广告(Open 版)
+#!desc=开屏/首页/搜索/附近/我的/路线/打车/POI详情推广清理。另一套独立实现，无参数开关；URL 一键导入，脚本从 GitHub 远程拉取并自动缓存，缓存后离线可用；与 amap_remove_ads 版二选一
+#!author=基于 RuCu6/kelee 逻辑重写的另一实现（Open 版）
+#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Amap.png
+#!category=GitHubWBB
+#!openUrl=https://apps.apple.com/app/id461703208
+#!date=2026-11-05
+
+# ===== 安装 =====
+# 1) 直接 URL 导入本模块即可，不用把脚本下载到本机：
+#      https://raw.githubusercontent.com/cdwbb/Surge/main/amap_remove_ads_open.sgmodule
+#    14 条 [Script] 都远程引用下面这个脚本，Surge 会自动下载并缓存（默认每 86400 秒检查更新）：
+#      https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js
+# 2) raw.githubusercontent.com 拉不到时，把 14 条 script-path 统一换成 jsDelivr 镜像：
+#      https://cdn.jsdelivr.net/gh/cdwbb/Surge@main/js/amap_remove_ads_open.js
+# 3) 打开 MITM 主开关并信任 Surge 的 CA 证书，打开 Rewrite 与 Scripting 开关。
+# 注意：与 amap_remove_ads.sgmodule（另一套实现）只启用一个，同时开启会重复改写同一响应体。
+
+[Rule]
+DOMAIN,amap-aos-info-nogw.amap.com,REJECT,extended-matching,pre-matching
+DOMAIN,free-aos-cdn-image.amap.com,REJECT,extended-matching,pre-matching
+DOMAIN-SUFFIX,v.smtcdns.com,REJECT,extended-matching,pre-matching
+
+[Body Rewrite]
+http-response-jq ^https:\/\/m5\.amap\.com\/ws\/shield\/search_business\/process\/marketingOperationStructured\? 'delpaths([["data","commonMaterial"]])'
+http-response-jq ^https:\/\/m5\.amap\.com\/ws\/shield\/search_business\/process\/marketingOperationStructured\? 'delpaths([["data","tipsOperationLocation"]])'
+http-response-jq ^https:\/\/m5\.amap\.com\/ws\/shield\/search_business\/process\/marketingOperationStructured\? 'delpaths([["data","resourcePlacement"]])'
+http-response-jq ^https:\/\/m5\.amap\.com\/ws\/shield\/search_poi\/homepage\? 'delpaths([["history_tags"]])'
+http-response-jq ^https:\/\/m5-zb\.amap\.com\/ws\/sharedtrip\/taxi\/order_detail_car_tips\? 'delpaths([["data","carTips","data","popupInfo"]])'
+
+[Map Local]
+^https:\/\/m5-zb\.amap\.com\/ws\/ride\/home\/page\/get_commuting_card\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/shield\/search_business\/process\/orderList\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/shield\/search\/new_hotword\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/faas\/amap-navigation\/card-service-(?:car-end|route-plan) data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/shield\/search_poi\/tips_adv\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/oss\.amap\.com\/ws\/banner\/lists\/\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/ai\.amap\.com\/v1\/ai_rec\/ data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/aos\/main\/page\/product\/list\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/faas\/amap-navigation\/(?:main-page-assets|main-page-location|ridewalk-end-fc|usr-profile-fc(?:\/|\@command:)homeV2) data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/(?:mapapi\/hint_text\/offline_data|message\/notice\/list|shield\/search(?:\/|\@command:)new_hotword) data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/shield\/scene\/recommend\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/valueadded\/weather\/v2\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/sns\.amap\.com\/ws\/msgbox\/pull_mp\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5-zb\.amap\.com\/ws\/boss\/(?:order\/car\/(?:feedback\/get_card_questions|feedback\/viptips|king_toolbox_car_bubble|remark\/satisfactionConf|rights_information)|tips(?:\/|\@command:)onscene_visual_optimization) data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5-zb\.amap\.com\/ws\/boss\/(?:pay\/web\/paySuccess\/info\/request|transportation\/diversion\/resource(?:\/|\@command:)driving) data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+
+[Script]
+高德-开屏广告 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/valueadded\/alimama\/splash_screen\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+高德-我的页面 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/dsp\/profile\/index\/nodefaasv3\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+高德-搜索热词 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/search_bff\/hotword\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+高德-图层配置 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/frogserver\/aocs\/updatable\/1\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+高德-附近页 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/search\/nearbyrec_smart\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+高德-酒店景区附近 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/c3frontend\/(?:af-(?:hotel|launch)\/page\/main|af-nearby(?:\/|\@command:)nearby), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+高德-首页卡片 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/faas\/amap-navigation\/(?:card-service-plan-home|main-page), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+高德-驾车路线 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/perception\/drive\/(?:routeInfo|routePlan), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+高德-公交整合 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/bus\/plan\/integrate\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+高德-路线规划前 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/aos\/perception\/publicTravel\/beforeNavi\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+高德-搜索详情 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/search_poi\/(?:mps|search\/sp|sug|tips_operation_location), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+高德-POI详情优惠 = type=http-response, pattern=^https:\/\/(?:info|m5)\.amap\.com\/ws\/shield\/search\/(?:common\/coupon\/info|poi\/detail), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+高德-打车卡片 = type=http-response, pattern=^https:\/\/m5-zb\.amap\.com\/ws\/boss\/(?:car\/order\/content_info|order_web(?:\/|\@command:)friendly_information), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+高德-打车资源位 = type=http-response, pattern=^https:\/\/m5-zb\.amap\.com\/ws\/promotion-web\/resource(?:\/|\@command:home)?\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+
+[MITM]
+hostname = %APPEND% *.amap.com
