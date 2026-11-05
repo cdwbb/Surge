@@ -1,4 +1,4 @@
-#!name=高德地图去广告
+#!name=高德地图去广告_work
 #!desc=开屏/首页/搜索/路线/我的/附近/打车去广告。URL 安装，脚本自动缓存。
 #!category=GitHubWBB
 #!arguments=开屏广告:1,首页推广:1,搜索推广:1,附近推荐:1,路线导航:1,打车推广:1,地点详情:1,我的页面:1,横幅消息:1,工具宫格:1,接口拦截:1,深层清洗:1,详情裁剪:0,输出日志:0
@@ -33,9 +33,9 @@
 #
 # ===== 安装 ===========================================================
 # 1) 直接 URL 导入本模块，模块开关打开即可：
-#      https://raw.githubusercontent.com/cdwbb/Surge/main/amap_remove_ads.sgmodule
+#      https://raw.githubusercontent.com/cdwbb/Surge/main/amap_remove_ads_work.sgmodule
 #    脚本由模块自动从下面这个地址下载并缓存（默认每 86400 秒检查一次更新）：
-#      https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js
+#      https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_work.js
 # 2) 打开 MITM 主开关并信任 Surge 的 CA 证书。模块只能追加 hostname，
 #    不能替你生成/信任证书，也不能打开 MITM 总开关。
 # 3) 打开 Rewrite 与 Scripting 功能开关。脚本属于 HTTP 处理管线，
@@ -44,7 +44,7 @@
 #    用 surge-cli dump profile effective 或 surge-cli profile diff 看生效结果。
 # 5) 脚本拉不到时（raw.githubusercontent.com 被墙/限流）：把 10 条
 #    script-path 换成 jsDelivr 镜像，其余不变：
-#      https://cdn.jsdelivr.net/gh/cdwbb/Surge@main/js/amap_remove_ads.js
+#      https://cdn.jsdelivr.net/gh/cdwbb/Surge@main/js/amap_remove_ads_work.js
 #    或用仓库里同目录的本地版模块 + 手动放置 js 文件。
 #
 # ===== 符合 Surge 官方约束的做法 ========================================
@@ -105,18 +105,18 @@ DOMAIN-SUFFIX,v.smtcdns.com,REJECT,extended-matching
 
 [Script]
 # ---- http-request：纯广告接口不发请求，直接返回 {} ----
-高德·拦截开屏与首页资源 = type=http-request,pattern=^https:\/\/m5\.amap\.com\/ws\/(?:valueadded\/alimama\/splash_screen\?|valueadded\/weather\/v2\?|faas\/amap-navigation\/(?:card-service-(?:car-end|route-plan)|main-page-(?:assets|aiqs|location)|ridewalk-end-fc|usr-profile-fc\/homeV2)|aos\/main\/page\/product\/list\?|info_bff\/rankingCard\?|mapapi\/hint_text\/offline_data|message\/notice\/list),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,timeout=10,argument=splash={{{开屏广告}}}&home={{{首页推广}}}&route={{{路线导航}}}&mock={{{接口拦截}}}&log={{{输出日志}}}
-高德·拦截搜索推广 = type=http-request,pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/(?:search\/new_hotword\?|search_bff\/hotword\?|search_business\/process\/orderList\?|search_poi\/tips_adv\?|scene\/recommend\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,timeout=10,argument=search={{{搜索推广}}}&mock={{{接口拦截}}}&log={{{输出日志}}}
-高德·拦截横幅与消息推广 = type=http-request,pattern=^https:\/\/(?:oss\.amap\.com\/ws\/banner\/lists\/\?|ai\.amap\.com\/v1\/ai_rec\/|sns\.amap\.com\/ws\/msgbox\/pull_mp\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,timeout=10,argument=banner={{{横幅消息}}}&mock={{{接口拦截}}}&log={{{输出日志}}}
-高德·拦截打车推广 = type=http-request,pattern=^https:\/\/m5-zb\.amap\.com\/ws\/(?:ride\/home\/page\/get_commuting_card\?|boss\/(?:order\/car\/(?:feedback\/get_card_questions|feedback\/viptips|king_toolbox_car_bubble|remark\/satisfactionConf|rights_information)|tips\/onscene_visual_optimization|pay\/web\/paySuccess\/info\/request|transportation\/diversion\/resource\/driving)|promotion-web\/resource(?:\/home)?\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,timeout=10,argument=taxi={{{打车推广}}}&mock={{{接口拦截}}}&log={{{输出日志}}}
+高德·拦截开屏与首页资源 = type=http-request,pattern=^https:\/\/m5\.amap\.com\/ws\/(?:valueadded\/alimama\/splash_screen\?|valueadded\/weather\/v2\?|faas\/amap-navigation\/(?:card-service-(?:car-end|route-plan)|main-page-(?:assets|aiqs|location)|ridewalk-end-fc|usr-profile-fc\/homeV2)|aos\/main\/page\/product\/list\?|info_bff\/rankingCard\?|mapapi\/hint_text\/offline_data|message\/notice\/list),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_work.js,timeout=10,argument=splash={{{开屏广告}}}&home={{{首页推广}}}&route={{{路线导航}}}&mock={{{接口拦截}}}&log={{{输出日志}}}
+高德·拦截搜索推广 = type=http-request,pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/(?:search\/new_hotword\?|search_bff\/hotword\?|search_business\/process\/orderList\?|search_poi\/tips_adv\?|scene\/recommend\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_work.js,timeout=10,argument=search={{{搜索推广}}}&mock={{{接口拦截}}}&log={{{输出日志}}}
+高德·拦截横幅与消息推广 = type=http-request,pattern=^https:\/\/(?:oss\.amap\.com\/ws\/banner\/lists\/\?|ai\.amap\.com\/v1\/ai_rec\/|sns\.amap\.com\/ws\/msgbox\/pull_mp\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_work.js,timeout=10,argument=banner={{{横幅消息}}}&mock={{{接口拦截}}}&log={{{输出日志}}}
+高德·拦截打车推广 = type=http-request,pattern=^https:\/\/m5-zb\.amap\.com\/ws\/(?:ride\/home\/page\/get_commuting_card\?|boss\/(?:order\/car\/(?:feedback\/get_card_questions|feedback\/viptips|king_toolbox_car_bubble|remark\/satisfactionConf|rights_information)|tips\/onscene_visual_optimization|pay\/web\/paySuccess\/info\/request|transportation\/diversion\/resource\/driving)|promotion-web\/resource(?:\/home)?\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_work.js,timeout=10,argument=taxi={{{打车推广}}}&mock={{{接口拦截}}}&log={{{输出日志}}}
 
 # ---- http-response：业务接口做字段级清洗 ----
-高德·首页与配置中心 = type=http-response,pattern=^https:\/\/m5\.amap\.com\/ws\/(?:shield\/frogserver\/aocs\/updatable\/1\?|shield\/dsp\/profile\/index\/nodefaasv3\?|faas\/amap-navigation\/(?:card-service-plan-home|main-page)),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,requires-body=true,max-size=2097152,timeout=10,argument=home={{{首页推广}}}&profile={{{我的页面}}}&route={{{路线导航}}}&strict={{{深层清洗}}}&log={{{输出日志}}}
-高德·搜索页与联想词 = type=http-response,pattern=^https:\/\/(?:m5|info)\.amap\.com\/ws\/shield\/(?:search_business\/process\/(?:marketingOperationStructured\?|middleLayer\/sug\?)|search_poi\/(?:homepage\?|mps|sug|search\/sp|tips_operation_location)|search\/(?:poi\/detail|common\/coupon\/info)),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,requires-body=true,max-size=2097152,timeout=10,argument=search={{{搜索推广}}}&poi={{{地点详情}}}&strict={{{深层清洗}}}&poi_strict={{{详情裁剪}}}&log={{{输出日志}}}
-高德·路线规划与导航结束页 = type=http-response,pattern=^https:\/\/m5\.amap\.com\/ws\/(?:aos\/perception\/publicTravel\/beforeNavi\?|bus\/plan\/integrate\?|perception\/drive\/(?:routeInfo|routePlan)|c3frontend\/(?:af-(?:hotel|launch)\/page\/main|af-nearby\/nearby)),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,requires-body=true,max-size=2097152,timeout=10,argument=route={{{路线导航}}}&poi={{{地点详情}}}&nearby={{{附近推荐}}}&strict={{{深层清洗}}}&log={{{输出日志}}}
-高德·附近页推荐 = type=http-response,pattern=^https:\/\/m5\.amap\.com\/ws\/(?:shield\/search\/nearbyrec_smart\?|smartui\/near_recommend\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,requires-body=true,max-size=2097152,timeout=10,argument=nearby={{{附近推荐}}}&strict={{{深层清洗}}}&log={{{输出日志}}}
-高德·打车页卡片 = type=http-response,pattern=^https:\/\/m5-zb\.amap\.com\/ws\/(?:sharedtrip\/taxi\/order_detail_car_tips\?|boss\/(?:car\/order\/content_info\?|order_web\/friendly_information)|amap\/hitch\/passenger\/content_info\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,requires-body=true,max-size=2097152,timeout=10,argument=taxi={{{打车推广}}}&strict={{{深层清洗}}}&log={{{输出日志}}}
-高德·详情页与工具宫格 = type=http-response,pattern=^https:\/\/(?:info|sns|center)\.amap\.com\/ws\/(?:c3frontend\/af-search\/search\?|opc\/tools\/list\?|amc\/server\/conv\/raise_list\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,requires-body=true,max-size=2097152,timeout=10,argument=search={{{搜索推广}}}&tools={{{工具宫格}}}&strict={{{深层清洗}}}&log={{{输出日志}}}
+高德·首页与配置中心 = type=http-response,pattern=^https:\/\/m5\.amap\.com\/ws\/(?:shield\/frogserver\/aocs\/updatable\/1\?|shield\/dsp\/profile\/index\/nodefaasv3\?|faas\/amap-navigation\/(?:card-service-plan-home|main-page)),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_work.js,requires-body=true,max-size=2097152,timeout=10,argument=home={{{首页推广}}}&profile={{{我的页面}}}&route={{{路线导航}}}&strict={{{深层清洗}}}&log={{{输出日志}}}
+高德·搜索页与联想词 = type=http-response,pattern=^https:\/\/(?:m5|info)\.amap\.com\/ws\/shield\/(?:search_business\/process\/(?:marketingOperationStructured\?|middleLayer\/sug\?)|search_poi\/(?:homepage\?|mps|sug|search\/sp|tips_operation_location)|search\/(?:poi\/detail|common\/coupon\/info)),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_work.js,requires-body=true,max-size=2097152,timeout=10,argument=search={{{搜索推广}}}&poi={{{地点详情}}}&strict={{{深层清洗}}}&poi_strict={{{详情裁剪}}}&log={{{输出日志}}}
+高德·路线规划与导航结束页 = type=http-response,pattern=^https:\/\/m5\.amap\.com\/ws\/(?:aos\/perception\/publicTravel\/beforeNavi\?|bus\/plan\/integrate\?|perception\/drive\/(?:routeInfo|routePlan)|c3frontend\/(?:af-(?:hotel|launch)\/page\/main|af-nearby\/nearby)),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_work.js,requires-body=true,max-size=2097152,timeout=10,argument=route={{{路线导航}}}&poi={{{地点详情}}}&nearby={{{附近推荐}}}&strict={{{深层清洗}}}&log={{{输出日志}}}
+高德·附近页推荐 = type=http-response,pattern=^https:\/\/m5\.amap\.com\/ws\/(?:shield\/search\/nearbyrec_smart\?|smartui\/near_recommend\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_work.js,requires-body=true,max-size=2097152,timeout=10,argument=nearby={{{附近推荐}}}&strict={{{深层清洗}}}&log={{{输出日志}}}
+高德·打车页卡片 = type=http-response,pattern=^https:\/\/m5-zb\.amap\.com\/ws\/(?:sharedtrip\/taxi\/order_detail_car_tips\?|boss\/(?:car\/order\/content_info\?|order_web\/friendly_information)|amap\/hitch\/passenger\/content_info\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_work.js,requires-body=true,max-size=2097152,timeout=10,argument=taxi={{{打车推广}}}&strict={{{深层清洗}}}&log={{{输出日志}}}
+高德·详情页与工具宫格 = type=http-response,pattern=^https:\/\/(?:info|sns|center)\.amap\.com\/ws\/(?:c3frontend\/af-search\/search\?|opc\/tools\/list\?|amc\/server\/conv\/raise_list\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_work.js,requires-body=true,max-size=2097152,timeout=10,argument=search={{{搜索推广}}}&tools={{{工具宫格}}}&strict={{{深层清洗}}}&log={{{输出日志}}}
 
 [MITM]
 hostname = %APPEND% *.amap.com

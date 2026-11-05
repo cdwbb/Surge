@@ -2,22 +2,22 @@
 
 自用 Surge 模块 / 脚本 / 规则。全部可直接用 URL 导入。
 
-## 高德地图去广告
+## 高德地图去广告（Work 版）
 
 开屏、首页卡片与图层、搜索（热词 / 联想 / 结果列表）、附近页、我的页面、路线规划、导航内插播广告、酒店与门票页、打车页资源位的推广清理。
 
 - 模块（导入这一个即可，脚本由模块自动下载缓存）：
-  https://raw.githubusercontent.com/cdwbb/Surge/main/amap_remove_ads.sgmodule
+  https://raw.githubusercontent.com/cdwbb/Surge/main/amap_remove_ads_work.sgmodule
 - 脚本：
-  https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js
+  https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_work.js
 - jsDelivr 镜像（GitHub 拉不到时，把模块里 10 条 script-path 换成这个）：
-  https://cdn.jsdelivr.net/gh/cdwbb/Surge@main/js/amap_remove_ads.js
+  https://cdn.jsdelivr.net/gh/cdwbb/Surge@main/js/amap_remove_ads_work.js
 
 前置条件：Surge 打开 MITM 主开关并信任 CA、打开 Rewrite 与 Scripting 开关。模块只能追加 MITM hostname，不能替你装证书或开总开关。
 
 ### 参数开关
 
-装好后在 Surge →「模块」→ 高德地图去广告 → 参数里改，`1` 开 `0` 关，自动生效，不用碰代码。
+装好后在 Surge →「模块」→ 高德地图去广告_work → 参数里改，`1` 开 `0` 关，自动生效，不用碰代码。
 
 | 参数 | 默认 | 作用 |
 | --- | --- | --- |
@@ -38,7 +38,7 @@
 
 参数名是中文，Surge 参数界面里直接显示成「开屏广告」这样的条目；下方说明按项一行排布。脚本内部仍用英文键（splash / home / …），两种写法都认，老配置升级后不会失效。
 
-另有一套接口清单与清洗策略都不同的独立实现（Open 版，无参数开关），见下一节；两套模块只启用一个。
+文件名与模块名都带 `_work` 后缀，和同名模块区分开。另有一套接口清单与清洗策略都不同的独立实现（Open 版，无参数开关），见下一节；两套模块只启用一个。
 
 ## 高德地图去广告 · Open 版（另一实现）
 
