@@ -32,13 +32,24 @@
  *   模块里 script-path 直接写文件名 Amap_remove_ads.js 即可。
  *   相对路径的解析基准是 Profile 目录，不是模块 URL —— 这点很关键。
  *
- * 开关
- *   DEBUG           true  在 Surge 流量查看器输出命中与删除统计
- *   STRICT_CLEAN    true  递归删除广告键 + 解析内嵌 JSON 配置串
- *                   false 只做精确路径删除（最保守）
- *   POI_DETAIL_STRICT
- *                   true  地点详情页按白名单裁剪（上游最新做法，较激进）
- *                   false 只删明显广告模块（默认，更安全）
+ * 开关（改 Surge 里模块的参数即可，不用改代码）
+ *   模块用 #!arguments 暴露 14 个参数，脚本从 $argument 解析：
+ *     splash      开屏广告                      1 开 / 0 关
+ *     home        首页卡片与图层配置            1 / 0
+ *     search      搜索页推广（热词/联想/结果）  1 / 0
+ *     nearby      附近页推荐                    1 / 0
+ *     route       路线规划与导航内广告          1 / 0
+ *     taxi        打车页资源位                  1 / 0
+ *     poi         地点详情页推广                1 / 0
+ *     profile     我的页面推广                  1 / 0
+ *     banner      横幅、AI 推荐、消息盒          1 / 0
+ *     tools       工具宫格、转化列表            1 / 0
+ *     mock        纯广告接口直接在请求阶段拦截  1 / 0
+ *     strict      通用递归清洗（较激进）        1 / 0
+ *     poi_strict  地点详情按白名单裁剪（激进）  1 / 0，默认 0
+ *     log         输出去广告日志                1 / 0，默认 0
+ *   缺省一律按「开」处理（log / poi_strict 除外），所以老配置不会因为
+ *   少传参数而失效。
  *
  * 注意
  *   - 使用 MITM 且信任 Surge CA 后脚本才会运行；Rewrite / Scripting 功能
@@ -53,9 +64,41 @@
 (function () {
   'use strict';
 
-  var DEBUG = false;
-  var STRICT_CLEAN = true;
-  var POI_DETAIL_STRICT = false;
+  /* =====================================================================
+   * 零、参数开关
+   *   $argument 由模块的 [Script] 条目传入，形如 home=1&taxi=0&log=1。
+   *   用 & 分隔而不是逗号：Surge 的 [Script] 参数本身就是逗号分隔的
+   *   key=value，值里再出现逗号会被截断。
+   * ===================================================================== */
+  var ARG_OFF = { '0': 1, 'false': 1, 'off': 1, 'no': 1 };
+  var ARGS = {};
+  (function parseArgs() {
+    var raw = (typeof $argument === 'string' && $argument) || '';
+    if (!raw) return;
+    var parts = raw.split('&');
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      var eq = p.indexOf('=');
+      if (eq <= 0) continue;
+      var k = p.slice(0, eq).replace(/\s+/g, '');
+      if (!k) continue;
+      ARGS[k] = p.slice(eq + 1).replace(/\s+/g, '').toLowerCase();
+    }
+  })();
+
+  /* 只有这三项默认为关，其余（含所有功能开关）默认为开。 */
+  var DEFAULT_OFF = { log: 1, poi_strict: 1 };
+
+  function flagOn(key) {
+    if (Object.prototype.hasOwnProperty.call(ARGS, key)) {
+      return !ARG_OFF[ARGS[key]];
+    }
+    return !DEFAULT_OFF[key];
+  }
+
+  var DEBUG = flagOn('log');
+  var STRICT_CLEAN = flagOn('strict');
+  var POI_DETAIL_STRICT = flagOn('poi_strict');
   var EMPTY_BODY = '{}';
   var MAX_DEPTH = 12;
   var MAX_NODES = 30000;
@@ -896,6 +939,41 @@
    * 三、URL 分派表
    * ===================================================================== */
 
+  /* 规则名 -> 功能开关名。开关关掉时该规则整条跳过，请求原样放行。
+   * 名字对不上（写错一个字）就会静默失效，所以 verify.js 会校验两张表里的
+   * 每个 name 都必须在这里出现。 */
+  var KEY_GROUPS = {
+    splash: ['开屏广告'],
+    home: ['首页配置中心', '首页主体', '首页资源位', '产品推广列表',
+      '榜单卡片', '天气挂件', '提示与通知'],
+    search: ['搜索热词', '搜索栏推广词', '订单列表推广', '搜索页广告位',
+      '场景推荐', '搜索业务结构化', '搜索首页', '搜索联想词',
+      '搜索中间层联想', '搜索结果列表', '搜索页横幅', '搜索页快捷入口'],
+    nearby: ['附近页模块', '附近信息流', '附近页'],
+    route: ['导航结束卡片', '导航前页面', '导航中路线信息', '驾车路线规划',
+      '路线规划页卡片', '公交列表', '步行导航结束页'],
+    taxi: ['通勤卡片', '打车评价与气泡', '打车红点与角标', '打车详情页气泡',
+      '打车页卡片', '打车顺风车卡片', '打车友好提示', '支付成功页推广'],
+    poi: ['地点详情', '优惠券信息', '酒店与门票页'],
+    profile: ['我的页面'],
+    banner: ['横幅列表', 'AI 推荐', '消息盒推广'],
+    tools: ['工具宫格', '转化列表']
+  };
+
+  var RULE_KEY = {};
+  (function buildRuleKey() {
+    for (var key in KEY_GROUPS) {
+      if (!Object.prototype.hasOwnProperty.call(KEY_GROUPS, key)) continue;
+      var names = KEY_GROUPS[key];
+      for (var i = 0; i < names.length; i++) RULE_KEY[names[i]] = key;
+    }
+  })();
+
+  function ruleOn(item) {
+    var key = RULE_KEY[item.name];
+    return key ? flagOn(key) : true;   // 未登记的名字按开启处理，不会静默丢功能
+  }
+
   /* http-request 阶段直接返回 {} 的纯广告接口（原 [Map Local] + 新版补充） */
   var MOCK_URLS = [
     { name: '开屏广告', re: /^https:\/\/m5\.amap\.com\/ws\/valueadded\/alimama\/splash_screen\?/ },
@@ -955,6 +1033,7 @@
 
   function matchUrl(list, u) {
     for (var i = 0; i < list.length; i++) {
+      if (!ruleOn(list[i])) continue;   // 该分类被参数关掉了，跳过
       if (list[i].re.test(u)) return list[i];
     }
     return null;
@@ -974,7 +1053,8 @@
 
     if (!isResponsePhase) {
       /* ---- http-request：纯广告接口根本不发出去 ---- */
-      var mock = matchUrl(MOCK_URLS, url);
+      /* mock=0 时不拦截，让请求照常发出、响应也原样放行（等于整类保留） */
+      var mock = flagOn('mock') ? matchUrl(MOCK_URLS, url) : null;
       if (mock) {
         log('[request] 拦截 ' + mock.name + ' -> ' + url);
         done({
