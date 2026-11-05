@@ -1,0 +1,52 @@
+#!name=高德地图去广告（自建脚本）
+#!desc=开屏/首页/搜索/附近/我的/路线/打车推广清理；脚本为本仓库 js/amap_ads_clean.js，不依赖 kelee.one。逻辑参考 RuCu6、luestr、QingRex 社区模块
+
+# =============================================================
+# 14 条脚本行共用同一个 js 文件，换托管地址时全文替换该 URL 即可。
+# 与仓库里已有的 amap_remove_ads.sgmodule 覆盖同一批接口，二选一启用，同时开会重复处理。
+# =============================================================
+
+[Rule]
+DOMAIN,amap-aos-info-nogw.amap.com,REJECT,extended-matching,pre-matching
+DOMAIN,free-aos-cdn-image.amap.com,REJECT,extended-matching,pre-matching
+DOMAIN-SUFFIX,v.smtcdns.com,REJECT,extended-matching,pre-matching
+
+[Body Rewrite]
+http-response-jq ^https:\/\/m5\.amap\.com\/ws\/shield\/search_business\/process\/marketingOperationStructured\? 'delpaths([["data","commonMaterial"],["data","tipsOperationLocation"],["data","resourcePlacement"]])'
+http-response-jq ^https:\/\/m5\.amap\.com\/ws\/shield\/search_poi\/homepage\? 'delpaths([["history_tags"]])'
+http-response-jq ^https:\/\/m5-zb\.amap\.com\/ws\/sharedtrip\/taxi\/order_detail_car_tips\? 'delpaths([["data","carTips","data","popupInfo"]])'
+
+[Map Local]
+^https:\/\/m5-zb\.amap\.com\/ws\/ride\/home\/page\/get_commuting_card\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/shield\/search_business\/process\/orderList\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/faas\/amap-navigation\/card-service-(?:car-end|route-plan) data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/shield\/search_poi\/tips_adv\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/oss\.amap\.com\/ws\/banner\/lists\/\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/ai\.amap\.com\/v1\/ai_rec\/ data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/aos\/main\/page\/product\/list\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/faas\/amap-navigation\/(?:main-page-assets|main-page-location|ridewalk-end-fc|usr-profile-fc/homeV2) data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/(?:mapapi\/hint_text\/offline_data|message\/notice\/list|shield\/search\/new_hotword) data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/shield\/scene\/recommend\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5\.amap\.com\/ws\/valueadded\/weather\/v2\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/sns\.amap\.com\/ws\/msgbox\/pull_mp\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5-zb\.amap\.com\/ws\/boss\/(?:order\/car\/(?:feedback\/get_card_questions|feedback\/viptips|king_toolbox_car_bubble|remark\/satisfactionConf|rights_information)|tips\/onscene_visual_optimization) data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/m5-zb\.amap\.com\/ws\/boss\/(?:pay\/web\/paySuccess\/info\/request|transportation\/diversion\/resource\/driving) data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+
+[Script]
+高德-开屏广告 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/valueadded\/alimama\/splash_screen\?, requires-body=true, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_ads_clean.js
+高德-路线规划前 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/aos\/perception\/publicTravel\/beforeNavi\?, requires-body=true, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_ads_clean.js
+高德-公交整合 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/bus\/plan\/integrate\?, requires-body=true, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_ads_clean.js
+高德-酒店景区页 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/c3frontend\/af-(?:hotel|launch)\/page\/main, requires-body=true, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_ads_clean.js
+高德-驾车路线 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/perception\/drive\/(?:routeInfo|routePlan), requires-body=true, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_ads_clean.js
+高德-搜索热词 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/search_bff\/hotword\?, requires-body=true, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_ads_clean.js
+高德-搜索列表与联想 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/search_poi\/(?:mps|search\/sp|sug|tips_operation_location), requires-body=true, max-size=1048576, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_ads_clean.js
+高德-首页卡片 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/faas\/amap-navigation\/(?:card-service-plan-home|main-page), requires-body=true, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_ads_clean.js
+高德-图层配置 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/frogserver\/aocs\/updatable\/1\?, requires-body=true, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_ads_clean.js
+高德-我的页面 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/dsp\/profile\/index\/nodefaasv3\?, requires-body=true, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_ads_clean.js
+高德-附近页 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/search\/nearbyrec_smart\?, requires-body=true, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_ads_clean.js
+高德-打车卡片 = type=http-response, pattern=^https:\/\/m5-zb\.amap\.com\/ws\/boss\/(?:car\/order\/content_info|order_web\/friendly_information), requires-body=true, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_ads_clean.js
+高德-打车资源位 = type=http-response, pattern=^https:\/\/m5-zb\.amap\.com\/ws\/promotion-web\/resource(?:\/home)?\?, requires-body=true, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_ads_clean.js
+高德-POI详情优惠 = type=http-response, pattern=^https:\/\/(?:info|m5)\.amap\.com\/ws\/shield\/search\/(?:common\/coupon\/info|poi\/detail), requires-body=true, max-size=1048576, timeout=10, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_ads_clean.js
+
+[MITM]
+hostname = %APPEND% *.amap.com
