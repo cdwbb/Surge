@@ -1,0 +1,100 @@
+#!name=高德地图去广告
+#!desc=开屏/首页/搜索/附近/我的/路线/打车推广清理。规则内置在模块自带的脚本里，用 URL 安装即可，无需手动放置脚本文件。
+#
+# ===== 来源与版本 =======================================================
+# 自写脚本，规则参考 QingRex/LoonKissSurge 的接口清单、上游 2026-10-20 版
+# 字段级规则，以及 RuCu6 amap.js（2024-10-15）的逐接口处理；未复制任何
+# 第三方脚本代码。本版唯一网络依赖是 Surge 拉取本仓库的 js 文件（缓存后
+# 离线可用）；要求完全离线请改用本地版模块。整理日期 2026-11-05。
+# 原模块的 https://kelee.one/.../Amap_remove_ads.js 在源站已返回 404，
+# 所以那个模块在任何设备上都不会生效。
+#
+# ===== 安装 ===========================================================
+# 1) 直接 URL 导入本模块，模块开关打开即可：
+#      https://raw.githubusercontent.com/cdwbb/Surge/main/amap_remove_ads.sgmodule
+#    脚本由模块自动从下面这个地址下载并缓存（默认每 86400 秒检查一次更新）：
+#      https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js
+# 2) 打开 MITM 主开关并信任 Surge 的 CA 证书。模块只能追加 hostname，
+#    不能替你生成/信任证书，也不能打开 MITM 总开关。
+# 3) 打开 Rewrite 与 Scripting 功能开关。脚本属于 HTTP 处理管线，
+#    这两个开关任一关闭都会静默不执行。
+# 4) 改完后重载配置。模块是「补丁」，UI 里看不到原 Profile 的变化，
+#    用 surge-cli dump profile effective 或 surge-cli profile diff 看生效结果。
+# 5) 脚本拉不到时（raw.githubusercontent.com 被墙/限流）：把 10 条
+#    script-path 换成 jsDelivr 镜像，其余不变：
+#      https://cdn.jsdelivr.net/gh/cdwbb/Surge@main/js/amap_remove_ads.js
+#    或用仓库里同目录的本地版模块 + 手动放置 js 文件。
+#
+# ===== 符合 Surge 官方约束的做法 ========================================
+# * [Script] 每条都显式写 type= 与 script-path=，参数之间不留空格（官方
+#   写法为逗号分隔的 key=value），pattern 内不含逗号（值里含逗号会被截断）。
+# * http-response 条目必须 requires-body=true，否则脚本拿不到响应体；
+#   max-size 显式给 2MB，避免大响应被静默 passthrough 跳过脚本。
+# * 10 条脚本名称唯一：[Script] 是键值段，重名会互相覆盖。
+# * [Rule] 只用官方允许的内置策略 REJECT；模块里的规则只能插到 Profile
+#   规则表最顶部，不能指定位置、也不能用自定义策略组。
+#   extended-matching 让域名规则同时匹配 SNI 与 Host。
+#   未用 pre-matching：它要求 iOS 5.14.0+ / Mac 5.9.0+，属于提前拒绝的
+#   性能优化，去掉后兼容更多版本；需要时可在三条规则末尾自行加上。
+# * [MITM] 用 %APPEND% 追加而不是覆盖，不会冲掉主配置里已有的 hostname。
+#   MITM 段在模块里只能改 hostname 与 skip-server-cert-verify。
+# * [Body Rewrite] / [Map Local] 不在官方 Module 可补丁的 Section 列表里，
+#   所以原模块那 5 + 15 条全部改为脚本实现（request 阶段 mock、response
+#   阶段字段清洗），本模块只保留 [Rule] + [Script] + [MITM]。
+#
+# ===== 排障 ===========================================================
+# * 脚本完全没跑：先查 MITM 是否覆盖 *.amap.com / CA 是否信任 / Rewrite 与
+#   Scripting 开关；再查 auto-quic-block（默认 true，命中 MITM 列表时会自动
+#   阻断 QUIC 迫使回退）。仍有漏网可在主配置加 PROTOCOL,QUIC,REJECT。
+# * 部分大响应没被清洗：body 超过 max-size 会静默跳过脚本，可调大该值或
+#   收窄 pattern；iOS 上若出现 Surge 被系统杀掉，改小 max-size 并给
+#   http-response 条目加 engine=webview。
+# * 逐组关闭功能：注释掉下面对应的 [Script] 行后重新导入模块，或直接禁用
+#   整个模块。模块注入的键值/规则在主配置 UI 里不可调，别在 UI 里找。
+# * 看脚本日志：surge-cli script-log <脚本名>；临时给该条目加 debug=true
+#   可从磁盘重载脚本并把 console.log 显示在请求备注里，上线前记得移除。
+# * 校验配置：surge-cli --check <profile.conf>；脚本顶部 DEBUG / STRICT_CLEAN /
+#   POI_DETAIL_STRICT 三个开关可按需切换。
+# * 同一请求每阶段最多跑一个脚本，且模块脚本插在 Profile 顶部：若主配置里
+#   已有针对同一 URL 的其他脚本，本模块的会优先命中。
+# * 若主配置的 MITM hostname 里已有靠前的 -*.amap.com 排除项，按顺序匹配会
+#   让追加的 *.amap.com 失效，需在生效配置里确认（MITM 列表按顺序匹配）。
+#
+# ===== 相比原模块 ======================================================
+# 原模块 15 条 [Script] 全指向已失效的远程脚本；且有 4 处重名（"移除路线
+# 规划推广"、"移除首页推广" 各两次），实际只生效 13 条。这里全部本地化并
+# 去重，另吸收以下字段级规则：
+#   * 配置中心 78 个图层键（{status,version,value} 结构置空，不直接删，
+#     避免客户端回退到内置默认值）；
+#   * 我的页面卡片白名单（含订单卡，不会丢掉订单入口）；
+#   * 地点详情 118 个广告模块的删除清单（默认启用，评论/编辑/交通/营业
+#     信息等功能模块不删），白名单裁剪降级为 POI_DETAIL_STRICT 可选项；
+#   * 搜索结果列表与搜索联想词分开处理（mps/search/sp 是列表，sug 才是
+#     联想词，两者结构完全不同）；
+#   * 导航插播语音广告 ads-*、公交列表推广、导航前公交卡路里、酒店页
+#     优惠入口、步行导航结束页推广卡等。
+#   * 附近页只按模块白名单裁剪，不整包返回 {}，避免附近页白屏。
+# ======================================================================
+
+[Rule]
+DOMAIN,amap-aos-info-nogw.amap.com,REJECT,extended-matching
+DOMAIN,free-aos-cdn-image.amap.com,REJECT,extended-matching
+DOMAIN-SUFFIX,v.smtcdns.com,REJECT,extended-matching
+
+[Script]
+# ---- http-request：纯广告接口不发请求，直接返回 {} ----
+高德·拦截开屏与首页资源 = type=http-request,pattern=^https:\/\/m5\.amap\.com\/ws\/(?:valueadded\/alimama\/splash_screen\?|valueadded\/weather\/v2\?|faas\/amap-navigation\/(?:card-service-(?:car-end|route-plan)|main-page-(?:assets|aiqs|location)|ridewalk-end-fc|usr-profile-fc\/homeV2)|aos\/main\/page\/product\/list\?|info_bff\/rankingCard\?|mapapi\/hint_text\/offline_data|message\/notice\/list),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,timeout=10
+高德·拦截搜索推广 = type=http-request,pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/(?:search\/new_hotword\?|search_bff\/hotword\?|search_business\/process\/orderList\?|search_poi\/tips_adv\?|scene\/recommend\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,timeout=10
+高德·拦截横幅与消息推广 = type=http-request,pattern=^https:\/\/(?:oss\.amap\.com\/ws\/banner\/lists\/\?|ai\.amap\.com\/v1\/ai_rec\/|sns\.amap\.com\/ws\/msgbox\/pull_mp\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,timeout=10
+高德·拦截打车推广 = type=http-request,pattern=^https:\/\/m5-zb\.amap\.com\/ws\/(?:ride\/home\/page\/get_commuting_card\?|boss\/(?:order\/car\/(?:feedback\/get_card_questions|feedback\/viptips|king_toolbox_car_bubble|remark\/satisfactionConf|rights_information)|tips\/onscene_visual_optimization|pay\/web\/paySuccess\/info\/request|transportation\/diversion\/resource\/driving)|promotion-web\/resource(?:\/home)?\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,timeout=10
+
+# ---- http-response：业务接口做字段级清洗 ----
+高德·首页与配置中心 = type=http-response,pattern=^https:\/\/m5\.amap\.com\/ws\/(?:shield\/frogserver\/aocs\/updatable\/1\?|shield\/dsp\/profile\/index\/nodefaasv3\?|faas\/amap-navigation\/(?:card-service-plan-home|main-page)),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,requires-body=true,max-size=2097152,timeout=10
+高德·搜索页与联想词 = type=http-response,pattern=^https:\/\/(?:m5|info)\.amap\.com\/ws\/shield\/(?:search_business\/process\/(?:marketingOperationStructured\?|middleLayer\/sug\?)|search_poi\/(?:homepage\?|mps|sug|search\/sp|tips_operation_location)|search\/(?:poi\/detail|common\/coupon\/info)),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,requires-body=true,max-size=2097152,timeout=10
+高德·路线规划与导航结束页 = type=http-response,pattern=^https:\/\/m5\.amap\.com\/ws\/(?:aos\/perception\/publicTravel\/beforeNavi\?|bus\/plan\/integrate\?|perception\/drive\/(?:routeInfo|routePlan)|c3frontend\/(?:af-(?:hotel|launch)\/page\/main|af-nearby\/nearby)),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,requires-body=true,max-size=2097152,timeout=10
+高德·附近页推荐 = type=http-response,pattern=^https:\/\/m5\.amap\.com\/ws\/(?:shield\/search\/nearbyrec_smart\?|smartui\/near_recommend\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,requires-body=true,max-size=2097152,timeout=10
+高德·打车页卡片 = type=http-response,pattern=^https:\/\/m5-zb\.amap\.com\/ws\/(?:sharedtrip\/taxi\/order_detail_car_tips\?|boss\/(?:car\/order\/content_info\?|order_web\/friendly_information)|amap\/hitch\/passenger\/content_info\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,requires-body=true,max-size=2097152,timeout=10
+高德·详情页与工具宫格 = type=http-response,pattern=^https:\/\/(?:info|sns|center)\.amap\.com\/ws\/(?:c3frontend\/af-search\/search\?|opc\/tools\/list\?|amc\/server\/conv\/raise_list\?),script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads.js,requires-body=true,max-size=2097152,timeout=10
+
+[MITM]
+hostname = %APPEND% *.amap.com
