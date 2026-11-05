@@ -2,6 +2,9 @@
  * 另一套独立实现：接口清单与清洗策略与 js/amap_remove_ads.js 不同，两套模块不要同时启用。
  * 由 amap_remove_ads_open.sgmodule 的 14 条 [Script] 通过 raw URL 远程引用，Surge 自动缓存；
  * 不依赖 kelee.one，也不需要把本文件下载到本机。
+ * 开关：模块用 #!arguments 暴露 9 个中文参数，1 开 0 关；由 [Script] 的
+ * argument= 传入，脚本用 $argument 解析，缺省一律按开处理（输出日志默认关）。
+ * 参数只控制脚本改写；模块里的静态规则段不受参数影响。
  * 覆盖：开屏 / 首页 / 搜索 / 附近 / 我的 / 路线规划 / 导航 / 打车 / POI 详情页 的推广清理。
  * 原理：对 http-response 的 JSON 按接口分支做字段删减与列表过滤，不阻断正常功能数据。
  */
@@ -10,6 +13,47 @@
  * 既保证提前退出语法合法，也避免声明泄漏到全局。
  */
 (function main() {
+// ---- 参数开关 ---------------------------------------------------------------
+/* $argument 由模块 [Script] 的 argument= 传入，形如
+ * 「splash=1&home=0&log=1」，用 & 分隔而不是逗号（[Script] 参数本身逗号分隔）。
+ * 中文参数名与英文键都认；未传的开关一律按「开」处理，只有 log 默认关。 */
+const ARG_ALIAS = {
+  "开屏广告": "splash", splash: "splash",
+  "首页推广": "home", home: "home",
+  "搜索推广": "search", search: "search",
+  "附近推荐": "nearby", nearby: "nearby",
+  "路线导航": "route", route: "route",
+  "打车推广": "taxi", taxi: "taxi",
+  "地点详情": "poi", poi: "poi",
+  "我的页面": "profile", profile: "profile",
+  "输出日志": "log", log: "log"
+};
+const ARG_OFF = { "0": 1, "false": 1, "off": 1, "no": 1 };
+const ARG_DEFAULT_OFF = { log: 1 };
+const ARGS = {};
+(function parseArgs() {
+  const raw = (typeof $argument === "string" && $argument) || "";
+  if (!raw) return;
+  for (const part of raw.split("&")) {
+    const eq = part.indexOf("=");
+    if (eq <= 0) continue;
+    const k = part.slice(0, eq).replace(/\s+/g, "");
+    if (!k) continue;
+    ARGS[ARG_ALIAS[k] || k] = part.slice(eq + 1).replace(/\s+/g, "").toLowerCase();
+  }
+})();
+// 缺省全开，只有 输出日志 默认关；老配置少传参数也不会丢功能
+const on = (key) => Object.prototype.hasOwnProperty.call(ARGS, key)
+  ? !ARG_OFF[ARGS[key]]
+  : !ARG_DEFAULT_OFF[key];
+const DEBUG = on("log");
+const log = (msg) => {
+  if (DEBUG && typeof console !== "undefined" && console.log) {
+    console.log("[AmapOpen] " + msg);
+  }
+};
+let dirty = false;
+
 // ---- 工具函数 ---------------------------------------------------------------
 
 // safe delete：对象链上任一环节不存在也不会抛错
@@ -256,7 +300,7 @@ let obj;
 try {
   obj = JSON.parse($response.body);
 } catch (e) {
-  console.log("amap_remove_ads_open.js: 响应体不是 JSON，跳过 " + e);
+  log("响应体不是 JSON，跳过 " + e);
   return $done({});
 }
 if (!obj || typeof obj !== "object") {
@@ -264,29 +308,34 @@ if (!obj || typeof obj !== "object") {
 }
 
 // 1) 公交出行：导航前接口（卡路里数值、左上角动图）
-if (has(url, "/aos/perception/publicTravel/beforeNavi")) {
+if (on("route") && has(url, "/aos/perception/publicTravel/beforeNavi")) {
+  dirty = true; log("命中 " + url);
   reset(obj?.data?.common_data?.bus_plan_bottom_event, "data", []);
   reset(obj?.data?.common_data?.bus_plan_segment_event, "data", []);
   reset(obj?.data?.front_end, "assistant", []);
 }
 // 2) 打车页：营销皮肤
-else if (has(url, "/boss/car/order/content_info")) {
+else if (on("taxi") && has(url, "/boss/car/order/content_info")) {
+  dirty = true; log("命中 " + url);
   reset(obj?.data?.lubanData?.skin, "dataList", []);
 }
 // 3) 打车页：横幅 / 轮播 / 皮肤 / 提示
-else if (has(url, "/boss/order_web/friendly_information") || has(url, "/boss/order_web/friendly-information")) {
+else if (on("taxi") && has(url, "/boss/order_web/friendly_information") || has(url, "/boss/order_web/friendly-information")) {
+  dirty = true; log("命中 " + url);
   const items = ["banners", "carouselTips", "integratedBanners", "integratedTips", "skins", "skinAndTips", "tips"];
   const d105 = obj?.data?.["105"];
   if (d105) del(d105, ...items);
 }
 // 4) 公交列表：顶部横图、打车推广
-else if (has(url, "/bus/plan/integrate")) {
+else if (on("route") && has(url, "/bus/plan/integrate")) {
+  dirty = true; log("命中 " + url);
   reset(obj?.data?.banner_lists, "data", []);
   reset(obj?.data?.banner_lists, "tips", []);
   reset(obj?.data?.mixed_plans?.data, "taxiPlans", []);
 }
 // 5) 酒店 / 民宿 / 景区门票 / 火车飞机页
-else if (has(url, "/c3frontend/af-hotel/page/main")) {
+else if (on("poi") && has(url, "/c3frontend/af-hotel/page/main")) {
+  dirty = true; log("命中 " + url);
   const modules = obj?.data?.modules;
   if (modules) {
     del(modules, "CouponPortalCard", "CouponWidget", "recommended_list");
@@ -298,25 +347,29 @@ else if (has(url, "/c3frontend/af-hotel/page/main")) {
   }
 }
 // 6) 步行导航结束推广卡片
-else if (has(url, "/c3frontend/af-launch/page/main")) {
+else if (on("route") && has(url, "/c3frontend/af-launch/page/main")) {
+  dirty = true; log("命中 " + url);
   reset(obj?.data?.modules?.C1EndNaviEngine, "data", {});
 }
 // 7) 附近页（FaaS 版）：清掉推广横幅与悬浮窗，保留页面主体
-else if (has(url, "/c3frontend/af-nearby")) {
+else if (on("nearby") && has(url, "/c3frontend/af-nearby")) {
+  dirty = true; log("命中 " + url);
   const modules = obj?.data?.modules;
   if (modules) {
     del(modules, "CouponPortalCard", "CouponWidget", "operation_banner", "poster_banner");
   }
 }
 // 8) 路线规划页：带 schema 参数的子卡片均为推广
-else if (has(url, "/faas/amap-navigation/card-service-plan-home")) {
+else if (on("route") && has(url, "/faas/amap-navigation/card-service-plan-home")) {
+  dirty = true; log("命中 " + url);
   const children = obj?.data?.children;
   if (Array.isArray(children) && children.length > 0) {
     obj.data.children = children.filter((i) => !Object.prototype.hasOwnProperty.call(i, "schema"));
   }
 }
 // 9) 首页底部卡片：只保留继续导航 / 常去地点 / 登录 / 找车
-else if (has(url, "/faas/amap-navigation/main-page")) {
+else if (on("home") && has(url, "/faas/amap-navigation/main-page")) {
+  dirty = true; log("命中 " + url);
   const keepCards = ["ContinueNavigationCard", "FrequentLocation", "LoginCard"];
   const cardList = obj?.data?.cardList;
   if (Array.isArray(cardList)) {
@@ -328,7 +381,8 @@ else if (has(url, "/faas/amap-navigation/main-page")) {
   }
 }
 // 10) 导航详情页：语音广告、助手皮肤、音乐底栏
-else if (has(url, "/perception/drive/routeInfo")) {
+else if (on("route") && has(url, "/perception/drive/routeInfo")) {
+  dirty = true; log("命中 " + url);
   if (Array.isArray(obj?.data?.tbt?.event)) {
     obj.data.tbt.event = obj.data.tbt.event.filter((i) => !isVoiceAd(i));
   }
@@ -344,7 +398,8 @@ else if (has(url, "/perception/drive/routeInfo")) {
   }
 }
 // 11) 驾车路线规划页
-else if (has(url, "/perception/drive/routePlan")) {
+else if (on("route") && has(url, "/perception/drive/routePlan")) {
+  dirty = true; log("命中 " + url);
   const fe = obj?.data?.front_end;
   if (fe) {
     del(fe, "assistant", "global_guide_data", "route_search", "start_button_tips");
@@ -357,12 +412,14 @@ else if (has(url, "/perception/drive/routePlan")) {
   }
 }
 // 12) 打车资源位：红点角标 / 弹窗 / 横幅 / 推送
-else if (has(url, "/promotion-web/resource")) {
+else if (on("taxi") && has(url, "/promotion-web/resource")) {
+  dirty = true; log("命中 " + url);
   const items = ["alpha", "banner", "bravo", "bubble", "charlie", "icon", "other", "popup", "push", "tips"];
   if (obj?.data) del(obj.data, ...items);
 }
 // 13) 我的页面
-else if (has(url, "/shield/dsp/profile/index/nodefaasv3")) {
+else if (on("profile") && has(url, "/shield/dsp/profile/index/nodefaasv3")) {
+  dirty = true; log("命中 " + url);
   const data = obj?.data;
   if (data) {
     del(data, "tipData", "memberInfo", "topMixedCard");
@@ -373,7 +430,8 @@ else if (has(url, "/shield/dsp/profile/index/nodefaasv3")) {
   }
 }
 // 14) 整体图层配置：把推广开关置为下线
-else if (has(url, "/shield/frogserver/aocs/updatable/")) {
+else if (on("home") && has(url, "/shield/frogserver/aocs/updatable/")) {
+  dirty = true; log("命中 " + url);
   const data = obj?.data;
   if (data) {
     for (const key of FROG_KEYS) {
@@ -384,11 +442,13 @@ else if (has(url, "/shield/frogserver/aocs/updatable/")) {
   }
 }
 // 15) 地图优惠推广
-else if (has(url, "/shield/search/common/coupon/info")) {
+else if (on("poi") && has(url, "/shield/search/common/coupon/info")) {
+  dirty = true; log("命中 " + url);
   if (obj?.data) obj.data = {};
 }
 // 16) 附近页：只保留轮播与推荐流
-else if (has(url, "/shield/search/nearbyrec_smart")) {
+else if (on("nearby") && has(url, "/shield/search/nearbyrec_smart")) {
+  dirty = true; log("命中 " + url);
   const keep = ["head", "search_hot_words", "feed_rec"];
   const modules = obj?.data?.modules;
   if (Array.isArray(modules)) {
@@ -401,16 +461,19 @@ else if (has(url, "/shield/search/nearbyrec_smart")) {
   }
 }
 // 17) POI 搜索详情页
-else if (has(url, "/shield/search/poi/detail")) {
+else if (on("poi") && has(url, "/shield/search/poi/detail")) {
+  dirty = true; log("命中 " + url);
   const modules = obj?.data?.modules;
   if (modules) del(modules, ...POI_DETAIL_MODULES);
 }
 // 18) 搜索框热榜
-else if (has(url, "/shield/search_bff/hotword")) {
+else if (on("search") && has(url, "/shield/search_bff/hotword")) {
+  dirty = true; log("命中 " + url);
   reset(obj?.data, "headerHotWord", []);
 }
 // 19) 搜索结果列表 / mps
-else if (has(url, "/shield/search_poi/search/sp") || has(url, "/shield/search_poi/mps") || has(url, "/shield/search_poi/sp@") /* 兼容 */ ) {
+else if (on("search") && has(url, "/shield/search_poi/search/sp") || has(url, "/shield/search_poi/mps") || has(url, "/shield/search_poi/sp@") /* 兼容 */ ) {
+  dirty = true; log("命中 " + url);
   const cleanListData = (list) => {
     if (!list) return;
     const content = list?.content && list.content[0];
@@ -452,7 +515,8 @@ else if (has(url, "/shield/search_poi/search/sp") || has(url, "/shield/search_po
   }
 }
 // 20) 搜索联想词：过滤广告位与推广主题
-else if (has(url, "/shield/search_poi/sug")) {
+else if (on("search") && has(url, "/shield/search_poi/sug")) {
+  dirty = true; log("命中 " + url);
   const badType = (t, dt) => String(dt) === "12" || ["ad", "poi_ad", "toplist"].includes(t?.result_type);
   if (Array.isArray(obj?.tip_list)) {
     obj.tip_list = obj.tip_list.filter((item) => {
@@ -478,7 +542,8 @@ else if (has(url, "/shield/search_poi/sug")) {
   }
 }
 // 21) 搜索页：底部结果上方窄横幅
-else if (has(url, "/shield/search_poi/tips_operation_location")) {
+else if (on("search") && has(url, "/shield/search_poi/tips_operation_location")) {
+  dirty = true; log("命中 " + url);
   const data = obj?.data;
   if (data) {
     del(data, "coupon");
@@ -501,7 +566,8 @@ else if (has(url, "/shield/search_poi/tips_operation_location")) {
   }
 }
 // 22) 开屏广告：保留结构但把有效期推到 2090 年、显示时长置零
-else if (has(url, "/valueadded/alimama/splash_screen")) {
+else if (on("splash") && has(url, "/valueadded/alimama/splash_screen")) {
+  dirty = true; log("命中 " + url);
   const ads = obj?.data?.ad;
   if (Array.isArray(ads) && ads.length > 0) {
     for (const item of ads) {
@@ -515,5 +581,8 @@ else if (has(url, "/valueadded/alimama/splash_screen")) {
   }
 }
 
+// 没有任何分支命中（含该分组被参数关闭）时原样放行，不重新序列化响应体
+if (!dirty) return $done({});
+log("处理完成 " + url);
 $done({ body: JSON.stringify(obj) });
 })();

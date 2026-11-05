@@ -1,10 +1,12 @@
 #!name=高德地图去广告(Open 版)
-#!desc=开屏/首页/搜索/附近/我的/路线/打车/POI详情推广清理。另一套独立实现，无参数开关；URL 一键导入，脚本从 GitHub 远程拉取并自动缓存，缓存后离线可用；与 amap_remove_ads 版二选一
+#!desc=开屏/首页/搜索/附近/我的/路线/打车/POI详情推广清理。另一套独立实现，带 9 个可调参数；URL 一键导入，脚本从 GitHub 远程拉取并自动缓存，缓存后离线可用；与 amap_remove_ads 版二选一
 #!author=基于 RuCu6/kelee 逻辑重写的另一实现（Open 版）
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Amap.png
 #!category=GitHubWBB
 #!openUrl=https://apps.apple.com/app/id461703208
 #!date=2026-11-05
+#!arguments=开屏广告:1,首页推广:1,搜索推广:1,附近推荐:1,我的页面:1,路线导航:1,打车推广:1,地点详情:1,输出日志:0
+#!arguments-desc=[页面开关] 1 = 开启 / 0 = 关闭\n- 开屏广告：开屏启动图有效期与显示时长\n- 首页推广：首页底部卡片与整体图层配置中心\n- 搜索推广：搜索热词、联想词、结果列表与搜索页横幅\n- 附近推荐：附近页推荐流与信息流\n- 路线导航：路线规划、导航语音广告、导航结束页\n- 打车推广：打车皮肤、横幅与资源位\n- 地点详情：POI 详情推广模块、酒店门票页与优惠券\n- 我的页面：我的页面卡片与活动入口\n\n[高级开关]\n- 输出日志：在 Surge 请求备注输出命中接口，排障用\n\n[说明]\n参数只控制脚本改写；[Rule] / [Body Rewrite] / [Map Local] 的静态规则始终生效。
 
 # ===== 安装 =====
 # 1) 直接 URL 导入本模块即可，不用把脚本下载到本机：
@@ -15,6 +17,13 @@
 #      https://cdn.jsdelivr.net/gh/cdwbb/Surge@main/js/amap_remove_ads_open.js
 # 3) 打开 MITM 主开关并信任 Surge 的 CA 证书，打开 Rewrite 与 Scripting 开关。
 # 注意：与 amap_remove_ads.sgmodule（另一套实现）只启用一个，同时开启会重复改写同一响应体。
+#
+# ===== 参数开关 =====
+# 在 Surge「模块 → 高德地图去广告(Open 版) → 参数」里改，1 开 0 关，改完自动重载。
+# 参数由 14 条 [Script] 的 argument= 传给脚本，脚本用 $argument 解析。
+# 占位符必须是三层花括号 {{{参数名}}}，中文名同样有效；#!arguments 用「名称:默认值」写法。
+# 注意 argument 的值里绝对不能出现逗号 —— [Script] 参数本身逗号分隔，值里用 & 分隔。
+# 参数只控制脚本改写；[Rule] / [Body Rewrite] / [Map Local] 的静态规则始终生效。
 
 [Rule]
 DOMAIN,amap-aos-info-nogw.amap.com,REJECT,extended-matching,pre-matching
@@ -46,20 +55,20 @@ http-response-jq ^https:\/\/m5-zb\.amap\.com\/ws\/sharedtrip\/taxi\/order_detail
 ^https:\/\/m5-zb\.amap\.com\/ws\/boss\/(?:pay\/web\/paySuccess\/info\/request|transportation\/diversion\/resource(?:\/|\@command:)driving) data-type=text data="{}" status-code=200 header="Content-Type:application/json"
 
 [Script]
-高德-开屏广告 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/valueadded\/alimama\/splash_screen\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
-高德-我的页面 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/dsp\/profile\/index\/nodefaasv3\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
-高德-搜索热词 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/search_bff\/hotword\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
-高德-图层配置 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/frogserver\/aocs\/updatable\/1\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
-高德-附近页 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/search\/nearbyrec_smart\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
-高德-酒店景区附近 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/c3frontend\/(?:af-(?:hotel|launch)\/page\/main|af-nearby(?:\/|\@command:)nearby), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
-高德-首页卡片 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/faas\/amap-navigation\/(?:card-service-plan-home|main-page), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
-高德-驾车路线 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/perception\/drive\/(?:routeInfo|routePlan), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
-高德-公交整合 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/bus\/plan\/integrate\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
-高德-路线规划前 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/aos\/perception\/publicTravel\/beforeNavi\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
-高德-搜索详情 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/search_poi\/(?:mps|search\/sp|sug|tips_operation_location), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
-高德-POI详情优惠 = type=http-response, pattern=^https:\/\/(?:info|m5)\.amap\.com\/ws\/shield\/search\/(?:common\/coupon\/info|poi\/detail), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
-高德-打车卡片 = type=http-response, pattern=^https:\/\/m5-zb\.amap\.com\/ws\/boss\/(?:car\/order\/content_info|order_web(?:\/|\@command:)friendly_information), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
-高德-打车资源位 = type=http-response, pattern=^https:\/\/m5-zb\.amap\.com\/ws\/promotion-web\/resource(?:\/|\@command:home)?\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760
+高德-开屏广告 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/valueadded\/alimama\/splash_screen\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760, argument=splash={{{开屏广告}}}&home={{{首页推广}}}&search={{{搜索推广}}}&nearby={{{附近推荐}}}&route={{{路线导航}}}&taxi={{{打车推广}}}&poi={{{地点详情}}}&profile={{{我的页面}}}&log={{{输出日志}}}
+高德-我的页面 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/dsp\/profile\/index\/nodefaasv3\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760, argument=splash={{{开屏广告}}}&home={{{首页推广}}}&search={{{搜索推广}}}&nearby={{{附近推荐}}}&route={{{路线导航}}}&taxi={{{打车推广}}}&poi={{{地点详情}}}&profile={{{我的页面}}}&log={{{输出日志}}}
+高德-搜索热词 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/search_bff\/hotword\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760, argument=splash={{{开屏广告}}}&home={{{首页推广}}}&search={{{搜索推广}}}&nearby={{{附近推荐}}}&route={{{路线导航}}}&taxi={{{打车推广}}}&poi={{{地点详情}}}&profile={{{我的页面}}}&log={{{输出日志}}}
+高德-图层配置 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/frogserver\/aocs\/updatable\/1\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760, argument=splash={{{开屏广告}}}&home={{{首页推广}}}&search={{{搜索推广}}}&nearby={{{附近推荐}}}&route={{{路线导航}}}&taxi={{{打车推广}}}&poi={{{地点详情}}}&profile={{{我的页面}}}&log={{{输出日志}}}
+高德-附近页 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/search\/nearbyrec_smart\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760, argument=splash={{{开屏广告}}}&home={{{首页推广}}}&search={{{搜索推广}}}&nearby={{{附近推荐}}}&route={{{路线导航}}}&taxi={{{打车推广}}}&poi={{{地点详情}}}&profile={{{我的页面}}}&log={{{输出日志}}}
+高德-酒店景区附近 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/c3frontend\/(?:af-(?:hotel|launch)\/page\/main|af-nearby(?:\/|\@command:)nearby), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760, argument=splash={{{开屏广告}}}&home={{{首页推广}}}&search={{{搜索推广}}}&nearby={{{附近推荐}}}&route={{{路线导航}}}&taxi={{{打车推广}}}&poi={{{地点详情}}}&profile={{{我的页面}}}&log={{{输出日志}}}
+高德-首页卡片 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/faas\/amap-navigation\/(?:card-service-plan-home|main-page), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760, argument=splash={{{开屏广告}}}&home={{{首页推广}}}&search={{{搜索推广}}}&nearby={{{附近推荐}}}&route={{{路线导航}}}&taxi={{{打车推广}}}&poi={{{地点详情}}}&profile={{{我的页面}}}&log={{{输出日志}}}
+高德-驾车路线 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/perception\/drive\/(?:routeInfo|routePlan), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760, argument=splash={{{开屏广告}}}&home={{{首页推广}}}&search={{{搜索推广}}}&nearby={{{附近推荐}}}&route={{{路线导航}}}&taxi={{{打车推广}}}&poi={{{地点详情}}}&profile={{{我的页面}}}&log={{{输出日志}}}
+高德-公交整合 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/bus\/plan\/integrate\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760, argument=splash={{{开屏广告}}}&home={{{首页推广}}}&search={{{搜索推广}}}&nearby={{{附近推荐}}}&route={{{路线导航}}}&taxi={{{打车推广}}}&poi={{{地点详情}}}&profile={{{我的页面}}}&log={{{输出日志}}}
+高德-路线规划前 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/aos\/perception\/publicTravel\/beforeNavi\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760, argument=splash={{{开屏广告}}}&home={{{首页推广}}}&search={{{搜索推广}}}&nearby={{{附近推荐}}}&route={{{路线导航}}}&taxi={{{打车推广}}}&poi={{{地点详情}}}&profile={{{我的页面}}}&log={{{输出日志}}}
+高德-搜索详情 = type=http-response, pattern=^https:\/\/m5\.amap\.com\/ws\/shield\/search_poi\/(?:mps|search\/sp|sug|tips_operation_location), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760, argument=splash={{{开屏广告}}}&home={{{首页推广}}}&search={{{搜索推广}}}&nearby={{{附近推荐}}}&route={{{路线导航}}}&taxi={{{打车推广}}}&poi={{{地点详情}}}&profile={{{我的页面}}}&log={{{输出日志}}}
+高德-POI详情优惠 = type=http-response, pattern=^https:\/\/(?:info|m5)\.amap\.com\/ws\/shield\/search\/(?:common\/coupon\/info|poi\/detail), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760, argument=splash={{{开屏广告}}}&home={{{首页推广}}}&search={{{搜索推广}}}&nearby={{{附近推荐}}}&route={{{路线导航}}}&taxi={{{打车推广}}}&poi={{{地点详情}}}&profile={{{我的页面}}}&log={{{输出日志}}}
+高德-打车卡片 = type=http-response, pattern=^https:\/\/m5-zb\.amap\.com\/ws\/boss\/(?:car\/order\/content_info|order_web(?:\/|\@command:)friendly_information), script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760, argument=splash={{{开屏广告}}}&home={{{首页推广}}}&search={{{搜索推广}}}&nearby={{{附近推荐}}}&route={{{路线导航}}}&taxi={{{打车推广}}}&poi={{{地点详情}}}&profile={{{我的页面}}}&log={{{输出日志}}}
+高德-打车资源位 = type=http-response, pattern=^https:\/\/m5-zb\.amap\.com\/ws\/promotion-web\/resource(?:\/|\@command:home)?\?, script-path=https://raw.githubusercontent.com/cdwbb/Surge/main/js/amap_remove_ads_open.js, requires-body=true, max-size=10485760, argument=splash={{{开屏广告}}}&home={{{首页推广}}}&search={{{搜索推广}}}&nearby={{{附近推荐}}}&route={{{路线导航}}}&taxi={{{打车推广}}}&poi={{{地点详情}}}&profile={{{我的页面}}}&log={{{输出日志}}}
 
 [MITM]
 hostname = %APPEND% *.amap.com
