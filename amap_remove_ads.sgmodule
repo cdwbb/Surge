@@ -1,7 +1,7 @@
 #!name=高德地图去广告
-#!desc=开屏/首页/搜索/附近/我的/路线/打车推广清理。规则内置在模块自带的脚本里，用 URL 安装即可，无需手动放置脚本文件。
+#!desc=开屏/首页/搜索/路线/我的/附近/打车去广告。URL 安装，脚本自动缓存。
 #!arguments=splash:1,home:1,search:1,nearby:1,route:1,taxi:1,poi:1,profile:1,banner:1,tools:1,mock:1,strict:1,poi_strict:0,log:0
-#!arguments-desc=每项 1=开启 0=关闭。splash 开屏 / home 首页与图层配置 / search 搜索页 / nearby 附近页 / route 路线与导航 / taxi 打车页 / poi 地点详情 / profile 我的页面 / banner 横幅与消息 / tools 工具宫格 / mock 纯广告接口请求阶段拦截 / strict 通用递归清洗 / poi_strict 详情页白名单裁剪（激进） / log 输出日志
+#!arguments-desc=1 开 / 0 关。第 1-10 项按页面：开屏｜首页｜搜索｜附近｜路线｜打车｜详情｜我的｜横幅｜工具；第 11-14 项高级：拦截｜清洗｜激进｜日志
 #
 # ===== 参数开关 =========================================================
 # 在 Surge 的「模块 → 高德地图去广告 → 参数」里直接改，改完自动重载，
