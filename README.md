@@ -38,7 +38,22 @@
 
 参数名是中文，Surge 参数界面里直接显示成「开屏广告」这样的条目；下方说明按项一行排布。脚本内部仍用英文键（splash / home / …），两种写法都认，老配置升级后不会失效。
 
-只想离线用（不联网拉脚本）：改用本地脚本版模块，把 sgmodule 与 js 一起放进 Profile（配置文件）所在目录，`script-path` 相对路径的解析基准就是 Profile 目录。
+只想离线用（不联网拉脚本）：改用下面这套「本地脚本版」模块，把 sgmodule 与 js 一起放进 Profile（配置文件）所在目录，`script-path` 相对路径的解析基准就是 Profile 目录。
+
+## 高德地图去广告 · 本地脚本版（另一实现）
+
+另一套独立实现：无参数开关、规则写死；接口清单与清洗策略与上面的 URL 安装版不同。脚本随模块放在本机，**完全离线**，不依赖 kelee.one / GitHub raw。
+
+- 模块：https://raw.githubusercontent.com/cdwbb/Surge/main/amap_local/amap_remove_ads_open.sgmodule
+- 脚本：https://raw.githubusercontent.com/cdwbb/Surge/main/amap_local/amap_remove_ads_open.js
+
+安装：
+
+1. 把上面两个文件都下载到 Surge 的 Profile（配置文件）所在目录，保持同目录；模块内 14 条 `[Script]` 的 `script-path` 都是纯文件名，会在本目录找到脚本。
+2. 模块可以用 URL 导入，也可以直接放进 Profile 目录；但**只导入模块不会生效**，必须把 js 也放进去。
+3. 打开 MITM 主开关并信任 CA、打开 Rewrite 与 Scripting 开关。
+
+> 两个高德模块**只启用一个**。同时开启会叠加 `[Rule]` / `[Map Local]` 拦截，并让两份脚本先后改写同一份响应体，可能导致字段缺失或页面异常。
 
 ## 其他
 
