@@ -1,5 +1,5 @@
 /* 高德地图去广告(Open 版) —— amap_remove_ads_open.js
- * 另一套独立实现：接口清单与清洗策略与 js/amap_remove_ads.js 不同，两套模块不要同时启用。
+ * 另一套独立实现：接口清单与清洗策略与 js/amap_remove_ads_work.js 不同，两套模块不要同时启用。
  * 由 amap_remove_ads_open.sgmodule 的 14 条 [Script] 通过 raw URL 远程引用，Surge 自动缓存；
  * 不依赖 kelee.one，也不需要把本文件下载到本机。
  * 开关：模块用 #!arguments 暴露 9 个中文参数，1 开 0 关；由 [Script] 的

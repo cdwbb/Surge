@@ -1,5 +1,5 @@
 #!name=高德地图去广告(Open 版)
-#!desc=开屏/首页/搜索/附近/我的/路线/打车/POI详情推广清理。另一套独立实现，带 9 个可调参数；URL 一键导入，脚本从 GitHub 远程拉取并自动缓存，缓存后离线可用；与 amap_remove_ads 版二选一
+#!desc=开屏/首页/搜索/附近/我的/路线/打车/POI详情推广清理。另一套独立实现，带 9 个可调参数；URL 一键导入，脚本从 GitHub 远程拉取并自动缓存，缓存后离线可用；与 _work 版二选一
 #!author=基于 RuCu6/kelee 逻辑重写的另一实现（Open 版）
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Amap.png
 #!category=GitHubWBB
@@ -16,7 +16,7 @@
 # 2) raw.githubusercontent.com 拉不到时，把 14 条 script-path 统一换成 jsDelivr 镜像：
 #      https://cdn.jsdelivr.net/gh/cdwbb/Surge@main/js/amap_remove_ads_open.js
 # 3) 打开 MITM 主开关并信任 Surge 的 CA 证书，打开 Rewrite 与 Scripting 开关。
-# 注意：与 amap_remove_ads.sgmodule（另一套实现）只启用一个，同时开启会重复改写同一响应体。
+# 注意：与 amap_remove_ads_work.sgmodule（另一套实现）只启用一个，同时开启会重复改写同一响应体。
 #
 # ===== 参数开关 =====
 # 在 Surge「模块 → 高德地图去广告(Open 版) → 参数」里改，1 开 0 关，改完自动重载。
