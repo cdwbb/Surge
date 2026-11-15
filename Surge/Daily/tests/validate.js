@@ -116,6 +116,7 @@ assert(result.output && /周末休息/.test(result.output.content), "calendar mo
 result = evaluate("Network_Panel.js");
 assert(result.output && /IPv4：192\.0\.2\.2/.test(result.output.content) && /不是 ICMP Ping/.test(result.output.content), "network mock must render environment and distinguish HTTP probe");
 assert(result.output && /HTTP 204/.test(result.output.content), "network mock must render probe status and latency");
+assert(result.output && /来源：Surge \$network/.test(result.output.content), "network mock must identify its local data source");
 result = evaluate("Oil_Panel.js");
 assert(result.output && /暂无可靠官方数据/.test(result.output.content), "oil mock must not invent official prices");
 result = evaluate("Weather_Panel.js", { failPattern: "api\\.open-meteo", initialStore: { cd_daily_weather_v1: JSON.stringify({ content: "旧天气缓存" }) } });

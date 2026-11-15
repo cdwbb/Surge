@@ -31,6 +31,7 @@
         lines.push("上次面板结果缓存于：" + new Date(previous.savedAt).toLocaleString());
       } catch (ignore) {}
     }
+    lines.push("来源：Surge $network 本机环境信息；探测目标见 settings.json。");
     lines.push("采集时间：" + new Date().toLocaleString());
     var content = lines.join("\n");
     $persistentStore.write(JSON.stringify({ content: content, savedAt: Date.now() }), key);
