@@ -2,6 +2,16 @@
 
 自用 Surge 模块 / 脚本 / 规则。全部可直接用 URL 导入。
 
+## 成都每日信息中心
+
+五张独立面板：成都天气、日期与节假日、空气质量、网络健康、四川油价。
+
+- 模块（脚本位于仓库根目录 `js/`）：
+  https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/Daily.sgmodule
+- [中文说明与 Module 参数表](Daily_README.md)
+
+城市、更新周期、通知阈值、网络探测目标和可选官方油价均可在 Surge 的 Module 参数中配置；节假日数据在 `config/holidays.json` 维护。
+
 ## 高德地图去广告（Work 版）
 
 开屏、首页卡片与图层、搜索（热词 / 联想 / 结果列表）、附近页、我的页面、路线规划、导航内插播广告、酒店与门票页、打车页资源位的推广清理。

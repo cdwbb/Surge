@@ -1,0 +1,25 @@
+#!name=成都每日信息中心
+#!desc=五个独立面板：成都天气、日期与节假日、空气质量、网络健康、四川油价。通知由独立 Cron 脚本运行。
+#!author=cdwbb
+#!system=ios
+#!category=生活
+#!arguments=city:成都,latitude:30.5728,longitude:104.0668,timezone:Asia/Shanghai,forecast_days:5,weather_refresh:1800,calendar_refresh:21600,air_refresh:1800,network_refresh:300,oil_refresh:21600,weather_notify:0,weather_cold:5,weather_hot:35,air_notify:0,air_aqi:100,network_timeout:8,probe_1_url:https://connectivitycheck.gstatic.com/generate_204,probe_2_url:https://www.apple.com/library/test/success.html,oil_notify:0,oil_date:none,oil_92:0,oil_95:0,oil_diesel:0,oil_source_url:none,oil_forecast_date:none,cron_schedule:0 8 * * *
+#!arguments-desc=city 与 latitude/longitude/timezone 配置城市；*_refresh 单位秒；weather_notify/air_notify/oil_notify 用 0 或 1；weather_cold/weather_hot 为 °C，air_aqi 为 US AQI 阈值；网络探测 URL 可改；油价仅在录入官方公告日期、价格和链接后显示；cron_schedule 为五段 Cron。
+
+[Panel]
+成都天气 = script-name=cd-daily-weather, update-interval={{{weather_refresh}}}
+日期与节假日 = script-name=cd-daily-calendar, update-interval={{{calendar_refresh}}}
+成都空气质量 = script-name=cd-daily-air, update-interval={{{air_refresh}}}
+网络健康 = script-name=cd-daily-network, update-interval={{{network_refresh}}}
+四川油价 = script-name=cd-daily-oil, update-interval={{{oil_refresh}}}
+
+[Script]
+cd-daily-weather = type=generic, script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/js/Weather_Panel.js, timeout=20, argument=city={{{city}}}&latitude={{{latitude}}}&longitude={{{longitude}}}&timezone={{{timezone}}}&forecast_days={{{forecast_days}}}
+cd-daily-calendar = type=generic, script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/js/Calendar_Panel.js, timeout=15
+cd-daily-air = type=generic, script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/js/Air_Panel.js, timeout=20, argument=city={{{city}}}&latitude={{{latitude}}}&longitude={{{longitude}}}&timezone={{{timezone}}}
+cd-daily-network = type=generic, script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/js/Network_Panel.js, timeout=20, argument=network_timeout={{{network_timeout}}}&probe_1_url={{{probe_1_url}}}&probe_2_url={{{probe_2_url}}}
+cd-daily-oil = type=generic, script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/js/Oil_Panel.js, timeout=12, argument=oil_date={{{oil_date}}}&oil_92={{{oil_92}}}&oil_95={{{oil_95}}}&oil_diesel={{{oil_diesel}}}&oil_source_url={{{oil_source_url}}}&oil_forecast_date={{{oil_forecast_date}}}
+
+cd-weather-notify = type=cron, cronexp="{{{cron_schedule}}}", script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/js/Weather_Notify.js, wake-system=1, timeout=20, argument=enabled={{{weather_notify}}}&city={{{city}}}&latitude={{{latitude}}}&longitude={{{longitude}}}&timezone={{{timezone}}}&weather_cold={{{weather_cold}}}&weather_hot={{{weather_hot}}}
+cd-air-notify = type=cron, cronexp="{{{cron_schedule}}}", script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/js/Air_Notify.js, wake-system=1, timeout=20, argument=enabled={{{air_notify}}}&city={{{city}}}&latitude={{{latitude}}}&longitude={{{longitude}}}&timezone={{{timezone}}}&air_aqi={{{air_aqi}}}
+cd-oil-notify = type=cron, cronexp="{{{cron_schedule}}}", script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/js/Oil_Notify.js, wake-system=1, timeout=15, argument=enabled={{{oil_notify}}}&oil_date={{{oil_date}}}&oil_92={{{oil_92}}}&oil_95={{{oil_95}}}&oil_diesel={{{oil_diesel}}}&oil_source_url={{{oil_source_url}}}

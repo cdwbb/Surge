@@ -8,7 +8,7 @@ var vm = require("vm");
 var root = path.resolve(__dirname, "..");
 var moduleText = fs.readFileSync(path.join(root, "Daily.sgmodule"), "utf8");
 var holidays = JSON.parse(fs.readFileSync(path.join(root, "config", "holidays.json"), "utf8"));
-var scriptFiles = fs.readdirSync(path.join(root, "js")).filter(function (f) { return /\.js$/.test(f); });
+var scriptFiles = ["Weather_Panel.js", "Weather_Notify.js", "Calendar_Panel.js", "Air_Panel.js", "Air_Notify.js", "Network_Panel.js", "Oil_Panel.js", "Oil_Notify.js"];
 var errors = [];
 function assert(condition, message) { if (!condition) errors.push(message); }
 function fileFor(name) { return path.join(root, "js", name); }
@@ -37,9 +37,9 @@ scriptSection.split(/\r?\n/).forEach(function (line) {
   if (match) {
     var name = match[1].trim();
     declared[name] = match[2];
-    var marker = "/Surge/Daily/";
+    var marker = "/surge-daily-v1/";
     var at = match[3].indexOf(marker);
-    assert(at >= 0, name + " script path must point inside Surge/Daily");
+    assert(at >= 0, name + " script path must point inside the branch root");
     if (at >= 0) assert(fs.existsSync(path.join(root, match[3].slice(at + marker.length))), name + " script path does not exist locally");
   }
 });

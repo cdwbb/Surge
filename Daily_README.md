@@ -14,7 +14,7 @@
 
 ## 导入与刷新
 
-1. 在 GitHub `cdwbb/Surge` 仓库的 `surge-daily-v1` 分支打开 `Surge/Daily/Daily.sgmodule`，复制 Raw URL。
+1. 在 GitHub `cdwbb/Surge` 仓库的 `surge-daily-v1` 分支打开根目录 `Daily.sgmodule`，复制 Raw URL。
 2. 在 iPhone Surge → **模块** → **安装新模块**，粘贴 URL 并安装/启用。确认 Surge 的 Scripting 已开启。
 3. 到 Surge 面板列表中分别点开五张卡片，使用各卡片自己的刷新操作。每张卡片可单独手动刷新；Module 为各卡片设置独立 `update-interval`。
 4. 首次打开时脚本从该分支的 GitHub Raw 地址加载。没有网络时天气/空气使用本地持久缓存，节假日表使用上次缓存；油价来自本机 Module 参数，不使用外部缓存。脚本执行完后 Surge 继续显示最后一份面板结果。
@@ -94,7 +94,7 @@ Surge Module 参数名只使用 ASCII 字母、数字和下划线；默认值和
 
 ## 故障排查
 
-- **面板脚本无法加载**：检查 Surge 网络、模块启用状态、脚本 URL 的分支名是否为 `surge-daily-v1`，并确认 `Surge/Daily/js/` 路径大小写。
+- **面板脚本无法加载**：检查 Surge 网络、模块启用状态、脚本 URL 的分支名是否为 `surge-daily-v1`，并确认根目录 `js/` 路径大小写。
 - **天气/空气为空或缓存旧**：确认 Open-Meteo API 可连通，稍后手动刷新；检查卡片中的数据时次和缓存提示。
 - **节假日数据未更新**：检查 GitHub Raw 是否可访问；旧缓存会显示缓存提示。核对 JSON 语法和年份 key。
 - **网络探测异常**：HTTP(S) 探测受当前网络、代理策略、目标服务和 TLS 状态影响；异常表示探测失败，不等于 ICMP 丢包。
