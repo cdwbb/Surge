@@ -195,12 +195,17 @@
     if (!response || response.statusCode < 200 || response.statusCode >= 400) {
       return fail(new Error("HTTP 状态码异常：" + (response ? response.statusCode : "无响应")), mode);
     }
+    var bodyText = String(body || "");
+    console.log("[限行查询] HTTP=" + response.statusCode + " bodyLength=" + bodyText.length);
     try {
-      var data = parsePage(body, args);
+      var data = parsePage(bodyText, args);
       console.log("[限行查询] 解析成功：" + data.content);
       if (mode === "notify") return notify(data);
       return finishPanel(data);
     } catch (e) {
+      var title = firstMatch(bodyText, /<title[^>]*>([\s\S]*?)<\/title>/i);
+      var excerpt = htmlToText(bodyText).slice(0, 240).replace(/\s+/g, " ");
+      console.log("[限行查询] 页面诊断 title=" + (title || "(无标题)") + " excerpt=" + (excerpt || "(空响应)"));
       return fail(e, mode);
     }
   });
