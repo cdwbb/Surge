@@ -1,211 +1,116 @@
 /*
- * Surge 车辆限行查询 - 修复版
- * 功能：面板展示 + 独立定时通知
- * 不依赖 Cheerio、jsDelivr 或其他外部 JS 库
+ * Surge 成都车辆限行查询 - 成都市公安局官方规则版
+ * 抓取成都市公安局官方通告中的常态限行规则，再按星期计算今日和明日尾号。
+ * 临时交通管制、法定节假日及调休安排可能改变常态规则，请以最新官方通告为准。
  */
-
 (function () {
   "use strict";
 
-  var DEFAULTS = {
-    city: "cd",
-    loo: "本地车",
-    cartype: "燃油车",
-    mode: "panel"
-  };
+  var OFFICIAL_URL = "https://cdgaj.chengdu.gov.cn/cdsgaj/jfts/2025-01/19/content_a78dfcd586d64dfcbc9c7bdf4060c158.shtml";
+  var DEFAULTS = { city: "cd", loo: "本地车", cartype: "燃油车", mode: "panel" };
 
   function parseArgs(raw) {
-    var result = {};
-    if (raw && typeof raw === "object") {
-      result = raw;
-    } else if (typeof raw === "string" && raw.length) {
-      raw.split("&").forEach(function (part) {
-        var p = part.indexOf("=");
-        var k = p >= 0 ? part.slice(0, p) : part;
-        var v = p >= 0 ? part.slice(p + 1) : "";
-        try {
-          result[decodeURIComponent(k.replace(/\+/g, " "))] =
-            decodeURIComponent(v.replace(/\+/g, " "));
-        } catch (_) {
-          result[k] = v;
-        }
-      });
-    }
-    Object.keys(DEFAULTS).forEach(function (key) {
-      if (result[key] === undefined || result[key] === "") {
-        result[key] = DEFAULTS[key];
-      }
+    var out = {};
+    if (raw && typeof raw === "object") out = raw;
+    else if (typeof raw === "string") raw.split("&").forEach(function (part) {
+      var i = part.indexOf("="), key = i < 0 ? part : part.slice(0, i), value = i < 0 ? "" : part.slice(i + 1);
+      try { out[decodeURIComponent(key.replace(/\+/g, " "))] = decodeURIComponent(value.replace(/\+/g, " ")); }
+      catch (_) { out[key] = value; }
     });
-    return result;
+    Object.keys(DEFAULTS).forEach(function (key) { if (out[key] === undefined || out[key] === "") out[key] = DEFAULTS[key]; });
+    return out;
   }
 
   function decodeHtml(text) {
-    var named = {
-      "&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">",
-      "&quot;": '"', "&#39;": "'", "&ldquo;": "“",
-      "&rdquo;": "”", "&mdash;": "—", "&hellip;": "…"
-    };
-    text = text.replace(/&nbsp;|&amp;|&lt;|&gt;|&quot;|&#39;|&ldquo;|&rdquo;|&mdash;|&hellip;/gi,
-      function (m) { return named[m.toLowerCase()] || m; });
-    text = text.replace(/&#(\d+);/g, function (_, n) {
-      return String.fromCharCode(parseInt(n, 10));
-    });
-    text = text.replace(/&#x([0-9a-f]+);/gi, function (_, n) {
-      return String.fromCharCode(parseInt(n, 16));
-    });
-    return text;
+    var named = { "&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'", "&ldquo;": "“", "&rdquo;": "”", "&mdash;": "—", "&hellip;": "…" };
+    text = text.replace(/&nbsp;|&amp;|&lt;|&gt;|&quot;|&#39;|&ldquo;|&rdquo;|&mdash;|&hellip;/gi, function (m) { return named[m.toLowerCase()] || m; });
+    text = text.replace(/&#(\d+);/g, function (_, n) { return String.fromCharCode(parseInt(n, 10)); });
+    return text.replace(/&#x([0-9a-f]+);/gi, function (_, n) { return String.fromCharCode(parseInt(n, 16)); });
   }
 
   function htmlToText(html) {
-    return decodeHtml(
-      String(html || "")
-        .replace(/<!--[\s\S]*?-->/g, " ")
-        .replace(/<(script|style|noscript)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
-        .replace(/<(br|hr)\b[^>]*>/gi, "\n")
-        .replace(/<\/(p|div|li|h[1-6]|section|article|tr|td|th|ul|ol)>/gi, "\n")
-        .replace(/<[^>]+>/g, " ")
-    ).replace(/[\t\r ]+/g, " ")
-     .replace(/\n\s*/g, "\n")
-     .replace(/\n{2,}/g, "\n")
-     .trim();
+    return decodeHtml(String(html || "")
+      .replace(/<!--[\s\S]*?-->/g, " ")
+      .replace(/<(script|style|noscript)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+      .replace(/<(br|hr)\b[^>]*>/gi, "\n")
+      .replace(/<\/(p|div|li|h[1-6]|section|article|tr|td|th|ul|ol)>/gi, "\n")
+      .replace(/<[^>]+>/g, " "))
+      .replace(/[\t\r ]+/g, " ").replace(/\n\s*/g, "\n").replace(/\n{2,}/g, "\n").trim();
   }
 
-  function firstMatch(text, regex) {
-    var m = text.match(regex);
-    return m ? String(m[1] || "").trim() : "";
-  }
-
-  function sectionText(text, label, stopLabels) {
-    var start = text.indexOf(label);
-    if (start < 0) return "";
-    start += label.length;
-    var end = text.length;
-    stopLabels.forEach(function (stop) {
-      var pos = text.indexOf(stop, start);
-      if (pos >= 0 && pos < end) end = pos;
-    });
-    return text.slice(start, end).replace(/^[\s:：]+|[\s:：]+$/g, "").trim();
-  }
-
-  function buildUrl(args) {
-    var city = String(args.city || "cd").toLowerCase().trim();
-    var host = city === "sz" ? "m.bendibao.com" : "m." + city + ".bendibao.com";
-    var query = "category=" + encodeURIComponent(args.cartype) +
-                "&loo=" + encodeURIComponent(args.loo);
-    return "https://" + host + "/news/xianxingchaxun/?" + query;
-  }
-
-  function parsePage(html, args) {
+  function extractOfficialRules(html) {
     var text = htmlToText(html);
-
-    var todayMatch = text.match(
-      /今日限行\s*(\d{1,2}月\d{1,2}日\s*[（(]周[一二三四五六日天][）)])\s*(不限号|[\d,，、]+)/
-    );
-    var tomorrowMatch = text.match(
-      /明日限行\s*(\d{1,2}月\d{1,2}日\s*[（(]周[一二三四五六日天][）)])\s*(不限号|[\d,，、]+)/
-    );
-
-    var todayDate = todayMatch ? todayMatch[1].trim() : "";
-    var todayRule = todayMatch ? todayMatch[2].trim() : "";
-    var tomorrowDate = tomorrowMatch ? tomorrowMatch[1].trim() : "";
-    var tomorrowRule = tomorrowMatch ? tomorrowMatch[2].trim() : "";
-
-    // 兼容页面不带星期括号的情况
-    if (!todayRule) {
-      var todayFallback = text.match(/今日限行\s*(\d{1,2}月\d{1,2}日)\s*(不限号|[\d,，、]+)/);
-      if (todayFallback) {
-        todayDate = todayFallback[1].trim();
-        todayRule = todayFallback[2].trim();
-      }
+    if (!/成都市公安局/.test(text) || !/尾号限行/.test(text)) {
+      var title = (String(html || "").match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || "";
+      throw new Error("未能确认取得成都市公安局限行通告。页面标题：" + htmlToText(title).slice(0, 100));
     }
-    if (!tomorrowRule) {
-      var tomorrowFallback = text.match(/明日限行\s*(\d{1,2}月\d{1,2}日)\s*(不限号|[\d,，、]+)/);
-      if (tomorrowFallback) {
-        tomorrowDate = tomorrowFallback[1].trim();
-        tomorrowRule = tomorrowFallback[2].trim();
-      }
-    }
-
-    var stops = ["查看详情", "限行时间", "限行区域", "限行规则", "今日限行", "明日限行"];
-    var rule = sectionText(text, "限行规则", stops);
-    var time = sectionText(text, "限行时间", stops);
-    var area = sectionText(text, "限行区域", stops);
-
-    // 页面可能重复展示不同车辆类别；请求参数由 category/loo 交给站点筛选。
-    if (!todayRule && !tomorrowRule && !time && !area && !rule) {
-      throw new Error("页面已返回，但未识别到限行字段。可能是网站 HTML 结构再次变化，或查询参数未被页面接受。");
-    }
-
-    var cityNames = { cd: "成都", bj: "北京", sh: "上海", sz: "深圳", gz: "广州", tj: "天津", cq: "重庆" };
-    var cityName = cityNames[String(args.city).toLowerCase()] || String(args.city).toUpperCase();
-    var title = cityName + "车辆限行（" + args.cartype + "·" + args.loo + "）";
-
-    var lines = [];
-    if (todayDate || todayRule) lines.push("今日限行：" + [todayDate, todayRule].filter(Boolean).join(" "));
-    if (tomorrowDate || tomorrowRule) lines.push("明日限行：" + [tomorrowDate, tomorrowRule].filter(Boolean).join(" "));
-    if (time) lines.push("限行时间：" + time);
-    if (area) lines.push("限行区域：" + area);
-    if (rule) lines.push("限行规则：" + rule);
-    lines.push("数据来源：成都本地宝");
-    lines.push("查询时间：" + new Date().toLocaleString());
-
-    return { title: title, content: lines.join("\n\n"), icon: "car" };
+    var days = ["星期一", "星期二", "星期三", "星期四", "星期五"];
+    var tails = {};
+    days.forEach(function (day, index) {
+      var pattern = day + "为[“‘\\\"]?(\\d)[”’\\\"]?\\s*(?:和|、|与)\\s*[“‘\\\"]?(\\d)";
+      var match = text.match(new RegExp(pattern));
+      if (!match) throw new Error("官方通告中未识别到" + day + "的尾号规则");
+      tails[index + 1] = match[1] + "、" + match[2];
+    });
+    var time = text.match(/“?尾号限行”?时间[：:]\s*工作日\s*(\d{1,2}:\d{2})\s*至\s*(\d{1,2}:\d{2})/);
+    if (!time) throw new Error("官方通告中未识别到限行时段");
+    return { tails: tails, time: time[1] + "–" + time[2] };
   }
 
-  function finishPanel(data) {
-    $done({ title: data.title, content: data.content, icon: data.icon || "car" });
+  function dateLine(date, rules) {
+    var weekday = date.getDay();
+    var weekdayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+    var label = (date.getMonth() + 1) + "月" + date.getDate() + "日（" + weekdayNames[weekday] + "）";
+    if (weekday === 0 || weekday === 6) return label + "：常态规则下不限行（周末）";
+    return label + "：尾号 " + rules.tails[weekday] + " 限行，时段 " + rules.time;
   }
 
-  function notify(data) {
-    $notification.post(data.title, "", data.content);
-    $done({});
+  function makeData(args, rules) {
+    var city = String(args.city).toLowerCase();
+    if (city !== "cd" && city !== "chengdu") throw new Error("此官方数据源仅支持成都，请将 city 参数设为 cd");
+    var now = new Date(), tomorrow = new Date(now.getTime());
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    var title = "成都车辆限行（" + args.cartype + "·" + args.loo + "）";
+    var content = "今日：" + dateLine(now, rules) + "\n明日：" + dateLine(tomorrow, rules) +
+      "\n\n依据：成都市公安局公布的常态尾号限行规则。\n" +
+      "提示：本结果按星期套用常态规则；法定节假日调休、临时管控等例外未自动核验，请以成都交警最新通告为准。\n" +
+      "官方通告：" + OFFICIAL_URL + "\n查询时间：" + now.toLocaleString();
+    return { title: title, content: content, icon: "car" };
   }
 
+  function finish(data, mode) {
+    if (mode === "notify") { $notification.post(data.title, "", data.content); $done({}); }
+    else $done({ title: data.title, content: data.content, icon: data.icon });
+  }
   function fail(error, mode) {
-    var message = (error && error.message) ? error.message : String(error);
+    var message = error && error.message ? error.message : String(error);
     console.log("[限行查询] 失败：" + message);
-    if (mode === "notify") {
-      $notification.post("车辆限行查询失败", "", message);
-      $done({});
-    } else {
-      $done({
-        title: "车辆限行查询失败",
-        content: "获取限行信息失败：\n" + message + "\n\n请检查网络或稍后重试。",
-        icon: "car"
-      });
-    }
+    if (mode === "notify") { $notification.post("成都限行查询失败", "", message); $done({}); }
+    else $done({ title: "成都限行查询失败", content: message + "\n\n请稍后重试或查看成都交警官方通告。", icon: "car" });
   }
 
   var args = parseArgs(typeof $argument === "undefined" ? "" : $argument);
   var mode = args.mode === "notify" ? "notify" : "panel";
-  var url = buildUrl(args);
-
-  console.log("[限行查询] mode=" + mode);
-  console.log("[限行查询] URL=" + url);
-
+  if (String(args.city).toLowerCase() !== "cd" && String(args.city).toLowerCase() !== "chengdu") return fail(new Error("此官方数据源仅支持成都，请将 city 参数设为 cd"), mode);
+  console.log("[限行查询] source=成都市公安局官方通告");
+  console.log("[限行查询] URL=" + OFFICIAL_URL);
   $httpClient.get({
-    url: url,
-    timeout: 15,
+    url: OFFICIAL_URL,
+    timeout: 20,
     headers: {
       "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile",
       "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
     }
   }, function (error, response, body) {
     if (error) return fail(error, mode);
-    if (!response || response.statusCode < 200 || response.statusCode >= 400) {
-      return fail(new Error("HTTP 状态码异常：" + (response ? response.statusCode : "无响应")), mode);
-    }
-    var bodyText = String(body || "");
-    console.log("[限行查询] HTTP=" + response.statusCode + " bodyLength=" + bodyText.length);
+    if (!body) return fail(new Error("成都市公安局未返回页面正文"), mode);
+    console.log("[限行查询] HTTP=" + (response && (response.statusCode || response.status) || "unknown") + " bodyLength=" + String(body).length);
     try {
-      var data = parsePage(bodyText, args);
-      console.log("[限行查询] 解析成功：" + data.content);
-      if (mode === "notify") return notify(data);
-      return finishPanel(data);
+      var data = makeData(args, extractOfficialRules(body));
+      return finish(data, mode);
     } catch (e) {
-      var title = firstMatch(bodyText, /<title[^>]*>([\s\S]*?)<\/title>/i);
-      var excerpt = htmlToText(bodyText).slice(0, 240).replace(/\s+/g, " ");
-      console.log("[限行查询] 页面诊断 title=" + (title || "(无标题)") + " excerpt=" + (excerpt || "(空响应)"));
+      var title = (String(body).match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || "";
+      console.log("[限行查询] 页面诊断 title=" + (htmlToText(title) || "(无标题)") + " excerpt=" + htmlToText(body).slice(0, 240));
       return fail(e, mode);
     }
   });
