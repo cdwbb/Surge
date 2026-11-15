@@ -1,120 +1,207 @@
 /*
-  车辆限行查询脚本
-  作者: GitHubWBB
-  功能: 查询指定城市的车辆限行信息，并支持通过 Surge 面板展示和定时任务推送。
-  修正: 由 Manus AI 进行了调试和优化，确保定时任务能正确发送通知。
-*/
+ * Surge 车辆限行查询 - 修复版
+ * 功能：面板展示 + 独立定时通知
+ * 不依赖 Cheerio、jsDelivr 或其他外部 JS 库
+ */
 
-const NAMESPACE = '限行查询'
-let $ = new Env(NAMESPACE, {
-    logLevel: 'info',
-    log() { },
-})
+(function () {
+  "use strict";
 
-// 定义一个main方法，用于处理所有的脚本逻辑
-async function main() {
+  var DEFAULTS = {
+    city: "cd",
+    loo: "本地车",
+    cartype: "燃油车",
+    mode: "panel"
+  };
+
+  function parseArgs(raw) {
+    var result = {};
+    if (raw && typeof raw === "object") {
+      result = raw;
+    } else if (typeof raw === "string" && raw.length) {
+      raw.split("&").forEach(function (part) {
+        var p = part.indexOf("=");
+        var k = p >= 0 ? part.slice(0, p) : part;
+        var v = p >= 0 ? part.slice(p + 1) : "";
+        try {
+          result[decodeURIComponent(k.replace(/\+/g, " "))] =
+            decodeURIComponent(v.replace(/\+/g, " "));
+        } catch (_) {
+          result[k] = v;
+        }
+      });
+    }
+    Object.keys(DEFAULTS).forEach(function (key) {
+      if (result[key] === undefined || result[key] === "") {
+        result[key] = DEFAULTS[key];
+      }
+    });
+    return result;
+  }
+
+  function decodeHtml(text) {
+    var named = {
+      "&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">",
+      "&quot;": '"', "&#39;": "'", "&ldquo;": "“",
+      "&rdquo;": "”", "&mdash;": "—", "&hellip;": "…"
+    };
+    text = text.replace(/&nbsp;|&amp;|&lt;|&gt;|&quot;|&#39;|&ldquo;|&rdquo;|&mdash;|&hellip;/gi,
+      function (m) { return named[m.toLowerCase()] || m; });
+    text = text.replace(/&#(\d+);/g, function (_, n) {
+      return String.fromCharCode(parseInt(n, 10));
+    });
+    text = text.replace(/&#x([0-9a-f]+);/gi, function (_, n) {
+      return String.fromCharCode(parseInt(n, 16));
+    });
+    return text;
+  }
+
+  function htmlToText(html) {
+    return decodeHtml(
+      String(html || "")
+        .replace(/<!--[\s\S]*?-->/g, " ")
+        .replace(/<(script|style|noscript)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+        .replace(/<(br|hr)\b[^>]*>/gi, "\n")
+        .replace(/<\/(p|div|li|h[1-6]|section|article|tr|td|th|ul|ol)>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+    ).replace(/[\t\r ]+/g, " ")
+     .replace(/\n\s*/g, "\n")
+     .replace(/\n{2,}/g, "\n")
+     .trim();
+  }
+
+  function firstMatch(text, regex) {
+    var m = text.match(regex);
+    return m ? String(m[1] || "").trim() : "";
+  }
+
+  function sectionText(text, label, stopLabels) {
+    var start = text.indexOf(label);
+    if (start < 0) return "";
+    start += label.length;
+    var end = text.length;
+    stopLabels.forEach(function (stop) {
+      var pos = text.indexOf(stop, start);
+      if (pos >= 0 && pos < end) end = pos;
+    });
+    return text.slice(start, end).replace(/^[\s:：]+|[\s:：]+$/g, "").trim();
+  }
+
+  function buildUrl(args) {
+    var city = String(args.city || "cd").toLowerCase().trim();
+    var host = city === "sz" ? "m.bendibao.com" : "m." + city + ".bendibao.com";
+    var query = "category=" + encodeURIComponent(args.cartype) +
+                "&loo=" + encodeURIComponent(args.loo);
+    return "https://" + host + "/news/xianxingchaxun/?" + query;
+  }
+
+  function parsePage(html, args) {
+    var text = htmlToText(html);
+
+    var todayMatch = text.match(
+      /今日限行\s*(\d{1,2}月\d{1,2}日\s*[（(]周[一二三四五六日天][）)])\s*(不限号|[\d,，、]+)/
+    );
+    var tomorrowMatch = text.match(
+      /明日限行\s*(\d{1,2}月\d{1,2}日\s*[（(]周[一二三四五六日天][）)])\s*(不限号|[\d,，、]+)/
+    );
+
+    var todayDate = todayMatch ? todayMatch[1].trim() : "";
+    var todayRule = todayMatch ? todayMatch[2].trim() : "";
+    var tomorrowDate = tomorrowMatch ? tomorrowMatch[1].trim() : "";
+    var tomorrowRule = tomorrowMatch ? tomorrowMatch[2].trim() : "";
+
+    // 兼容页面不带星期括号的情况
+    if (!todayRule) {
+      var todayFallback = text.match(/今日限行\s*(\d{1,2}月\d{1,2}日)\s*(不限号|[\d,，、]+)/);
+      if (todayFallback) {
+        todayDate = todayFallback[1].trim();
+        todayRule = todayFallback[2].trim();
+      }
+    }
+    if (!tomorrowRule) {
+      var tomorrowFallback = text.match(/明日限行\s*(\d{1,2}月\d{1,2}日)\s*(不限号|[\d,，、]+)/);
+      if (tomorrowFallback) {
+        tomorrowDate = tomorrowFallback[1].trim();
+        tomorrowRule = tomorrowFallback[2].trim();
+      }
+    }
+
+    var stops = ["查看详情", "限行时间", "限行区域", "限行规则", "今日限行", "明日限行"];
+    var rule = sectionText(text, "限行规则", stops);
+    var time = sectionText(text, "限行时间", stops);
+    var area = sectionText(text, "限行区域", stops);
+
+    // 页面可能重复展示不同车辆类别；请求参数由 category/loo 交给站点筛选。
+    if (!todayRule && !tomorrowRule && !time && !area && !rule) {
+      throw new Error("页面已返回，但未识别到限行字段。可能是网站 HTML 结构再次变化，或查询参数未被页面接受。");
+    }
+
+    var cityNames = { cd: "成都", bj: "北京", sh: "上海", sz: "深圳", gz: "广州", tj: "天津", cq: "重庆" };
+    var cityName = cityNames[String(args.city).toLowerCase()] || String(args.city).toUpperCase();
+    var title = cityName + "车辆限行（" + args.cartype + "·" + args.loo + "）";
+
+    var lines = [];
+    if (todayDate || todayRule) lines.push("今日限行：" + [todayDate, todayRule].filter(Boolean).join(" "));
+    if (tomorrowDate || tomorrowRule) lines.push("明日限行：" + [tomorrowDate, tomorrowRule].filter(Boolean).join(" "));
+    if (time) lines.push("限行时间：" + time);
+    if (area) lines.push("限行区域：" + area);
+    if (rule) lines.push("限行规则：" + rule);
+    lines.push("数据来源：成都本地宝");
+    lines.push("查询时间：" + new Date().toLocaleString());
+
+    return { title: title, content: lines.join("\n\n"), icon: "car" };
+  }
+
+  function finishPanel(data) {
+    $done({ title: data.title, content: data.content, icon: data.icon || "car" });
+  }
+
+  function notify(data) {
+    $notification.post(data.title, "", data.content);
+    $done({});
+  }
+
+  function fail(error, mode) {
+    var message = (error && error.message) ? error.message : String(error);
+    console.log("[限行查询] 失败：" + message);
+    if (mode === "notify") {
+      $notification.post("车辆限行查询失败", "", message);
+      $done({});
+    } else {
+      $done({
+        title: "车辆限行查询失败",
+        content: "获取限行信息失败：\n" + message + "\n\n请检查网络或稍后重试。",
+        icon: "car"
+      });
+    }
+  }
+
+  var args = parseArgs(typeof $argument === "undefined" ? "" : $argument);
+  var mode = args.mode === "notify" ? "notify" : "panel";
+  var url = buildUrl(args);
+
+  console.log("[限行查询] mode=" + mode);
+  console.log("[限行查询] URL=" + url);
+
+  $httpClient.get({
+    url: url,
+    timeout: 15,
+    headers: {
+      "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    }
+  }, function (error, response, body) {
+    if (error) return fail(error, mode);
+    if (!response || response.statusCode < 200 || response.statusCode >= 400) {
+      return fail(new Error("HTTP 状态码异常：" + (response ? response.statusCode : "无响应")), mode);
+    }
     try {
-        // 获取数据
-        let data = getData();
-        // 加载模块
-        $.Cheerio = await loadCheerio();
-        // 获取网页
-        let html = await getHtml(data.url);
-        // 将 HTML 内容加载到 Cheerio
-        const query = $.Cheerio.load(html);
-        // 提取标题内容
-        const title = query('.title-name.font').text().trim();
-        // 输出提取的标题
-        $.info(title);
-        const limitList = query('.limit-list').first();
-
-        const today = limitList.find('.today');
-        const tomorrow = limitList.find('.tomorrow');
-
-        const todayDate = today.find('.date').text().trim();
-        const todayRule = today.find('.rule').text().trim();
-
-        const tomorrowDate = tomorrow.find('.date').text().trim();
-        const tomorrowRule = tomorrow.find('.rule').text().trim();
-
-        $.info(`日期: ${todayDate}`);
-        $.info(`规则: ${todayRule}`);
-
-        $.info(`日期: ${tomorrowDate}`);
-        $.info(`规则: ${tomorrowRule}`);
-
-        // 获取限行详细信息
-        const limitDetail = query('.limit-detail.xianxin').first();
-
-        // 获取限行时间信息
-        const limitTime = limitDetail.find('.limit-time .cicle-text').text().trim();
-
-        // 获取限行区域信息
-        const limitLocal = limitDetail.find('.limit-local .cicle-text').text().trim();
-
-        // 获取限行规则信息
-        const limitRule = limitDetail.find('.limit-rule .cicle-text').text().trim();
-
-        $.info(`限行时间: ${limitTime}`);
-        $.info(`限行区域: ${limitLocal}`);
-        $.info(`限行规则: ${limitRule}`);
-        let content = "";
-        if (todayDate || todayRule) content += `今日限行: ${todayDate} ${todayRule}\n`;
-        if (tomorrowDate || tomorrowRule) content += `明日限行: ${tomorrowDate} ${tomorrowRule}\n\n`;
-        if (limitTime) content += `限行时间: ${limitTime}\n\n`
-        if (limitLocal) content += `限行区域: ${limitLocal.length >= 100 ? "详细限行规则请前往本地宝查看" : limitLocal}`
-
-        return { title: `${title}信息 ${decodeURIComponent(data.cartype)} ${decodeURIComponent(data.loo)}`, content: content, icon: `car` }
+      var data = parsePage(body, args);
+      console.log("[限行查询] 解析成功：" + data.content);
+      if (mode === "notify") return notify(data);
+      return finishPanel(data);
     } catch (e) {
-        throw e;
+      return fail(e, mode);
     }
-}
-
-// 主程序执行入口
-!(async () => {
-    $.info(`🔔 ${new Date().toLocaleString()}`)
-    const { title, content, icon } = await main();
-    
-    // --- 修正之处 ---
-    // 在调用 $.done() 之前，使用 $.msg() 来发送通知。
-    // 这确保了无论是作为面板更新还是定时任务，都能有正确的输出。
-    $.msg(title, "", content, { icon: icon });
-    
-    $.done({ title, content, icon })
-})()
-    .catch(async e => {
-        $.error(`❌ ${e.message || e}`)
-        $.error(e)
-        $.msg($.name, `❌ ${e.message || e}`, "");
-        $.done({ title: "车辆限行信息", content: "未获取到相应信息，请检查配置是否正确", icon: "car" })
-    })
-    .finally(async () => {
-    })
-
-// 定义一个方法，用于获取监控网站的数据
-async function getHtml(url) {
-    let html = (await $.http.get(url ))['body'];
-    return html;
-}
-
-function getData() {
-    try {
-        // 传入参数：city、cartype、loo
-        let quires = getArgs();
-        quires.cartype = encodeURIComponent(quires.cartype);
-        quires.loo = encodeURIComponent(quires.loo);
-        quires.url = quires.city == 'sz'
-            ? 'http://m.bendibao.com/news/xianxingchaxun/'
-            : `http://m.${quires.city}.bendibao.com/news/xianxingchaxun/index.php?category=${quires.cartype}&loo=${quires.loo}`;
-        return quires;
-    } catch (e ) {
-        throw e;
-    }
-}
-
-// 加载cheerio
-async function loadCheerio() { let code = ($.isNode() ? require("cheerio") : $.getdata("Cheerio_code")) || ""; return $.isNode() ? code : code && Object.keys(code).length ? (console.log("[INFO] 缓存中存在Cheerio代码, 跳过下载\n"), eval(code), createCheerio()) : (console.log("[INFO] 开始下载CryptoJS代码\n"), new Promise((async resolve => { $.getScript("https://cdn.jsdelivr.net/gh/Yuheng0101/X@main/Utils/cheerio.js" ).then((fn => { $.setdata(fn, "Cheerio_code"), eval(fn); const cheerio = createCheerio; console.log("[INFO] Cheerio加载成功, 请继续\n"), resolve(cheerio) })) }))) }
-// 获取args参数方法
-function getArgs(t = {}) { let e; return e = "undefined" != typeof $argument ? Object.fromEntries($argument.split("&").map((t => t.split("=")))) : {}, $.info(`传入的 $argument: ${$.toStr(e)}`), e = { ...e, ...$.getjson(NAMESPACE, t) }, $.info(`从持久化存储读取参数后: ${$.toStr(e)}`), e }
-// prettier-ignore
-function Env(t, e) { class s { constructor(t) { this.env = t } send(t, e = "GET") { t = "string" == typeof t ? { url: t } : t; let s = this.get; return "POST" === e && (s = this.post), new Promise(((e, i) => { s.call(this, t, ((t, s, o) => { t ? i(t) : e(s) })) })) } get(t) { return this.send.call(this.env, t) } post(t) { return this.send.call(this.env, t, "POST") } } return new class { constructor(t, e) { this.logLevels = { debug: 0, info: 1, warn: 2, error: 3 }, this.logLevelPrefixs = { debug: "[DEBUG] ", info: "[INFO] ", warn: "[WARN] ", error: "[ERROR] " }, this.logLevel = "info", this.name = t, this.http = new s(this ), this.data = null, this.dataFile = "box.dat", this.logs = [], this.isMute = !1, this.isNeedRewrite = !1, this.logSeparator = "\n", this.encoding = "utf-8", this.startTime = (new Date).getTime(), Object.assign(this, e), this.log("", `🔔${this.name}, 开始!`) } getEnv() { return "undefined" != typeof $environment && $environment["surge-version"] ? "Surge" : "undefined" != typeof $environment && $environment["stash-version"] ? "Stash" : "undefined" != typeof module && module.exports ? "Node.js" : "undefined" != typeof $task ? "Quantumult X" : "undefined" != typeof $loon ? "Loon" : "undefined" != typeof $rocket ? "Shadowrocket" : void 0 } isNode() { return "Node.js" === this.getEnv() } isQuanX() { return "Quantumult X" === this.getEnv() } isSurge() { return "Surge" === this.getEnv() } isLoon() { return "Loon" === this.getEnv() } isShadowrocket() { return "Shadowrocket" === this.getEnv() } isStash() { return "Stash" === this.getEnv() } toObj(t, e = null) { try { return JSON.parse(t) } catch { return e } } toStr(t, e = null, ...s) { try { return JSON.stringify(t, ...s) } catch { return e } } getjson(t, e) { let s = e; if (this.getdata(t)) try { s = JSON.parse(this.getdata(t)) } catch { } return s } setjson(t, e) { try { return this.setdata(JSON.stringify(t), e) } catch { return !1 } } getScript(t) { return new Promise((e => { this.get({ url: t }, ((t, s, i) => e(i))) })) } runScript(t, e) { return new Promise((s => { let i = this.getdata("@chavy_boxjs_userCfgs.httpapi" ); i = i ? i.replace(/\n/g, "").trim() : i; let o = this.getdata("@chavy_boxjs_userCfgs.httpapi_timeout" ); o = o ? 1 * o : 20, o = e && e.timeout ? e.timeout : o; const [r, a] = i.split("@"), n = { url: `http://${a}/v1/scripting/evaluate`, body: { script_text: t, mock_type: "cron", timeout: o }, headers: { "X-Key": r, Accept: "*/*" }, timeout: o }; this.post(n, ((t, e, i ) => s(i))) })).catch((t => this.logErr(t))) } loaddata() { if (!this.isNode()) return {}; { this.fs = this.fs ? this.fs : require("fs"), this.path = this.path ? this.path : require("path"); const t = this.path.resolve(this.dataFile), e = this.path.resolve(process.cwd(), this.dataFile), s = this.fs.existsSync(t), i = !s && this.fs.existsSync(e); if (!s && !i) return {}; { const i = s ? t : e; try { return JSON.parse(this.fs.readFileSync(i)) } catch (t) { return {} } } } } writedata() { if (this.isNode()) { this.fs = this.fs ? this.fs : require("fs"), this.path = this.path ? this.path : require("path"); const t = this.path.resolve(this.dataFile), e = this.path.resolve(process.cwd(), this.dataFile), s = this.fs.existsSync(t), i = !s && this.fs.existsSync(e), o = JSON.stringify(this.data); s ? this.fs.writeFileSync(t, o) : i ? this.fs.writeFileSync(e, o) : this.fs.writeFileSync(t, o) } } lodash_get(t, e, s) { const i = e.replace(/\[(\d+)\]/g, ".$1").split("."); let o = t; for (const t of i) if (o = Object(o)[t], void 0 === o) return s; return o } lodash_set(t, e, s) { return Object(t) !== t || (Array.isArray(e) || (e = e.toString().match(/[^.[\]]+/g) || []), e.slice(0, -1).reduce(((t, s, i) => Object(t[s]) === t[s] ? t[s] : t[s] = Math.abs(e[i + 1]) >> 0 == +e[i + 1] ? [] : {}), t)[e[e.length - 1]] = s), t } getdata(t) { let e = this.getval(t); if (/^@/.test(t)) { const [, s, i] = /^@(.*?)\.(.*?)$/.exec(t), o = s ? this.getval(s) : ""; if (o) try { const t = JSON.parse(o); e = t ? this.lodash_get(t, i, "") : e } catch (t) { e = "" } } return e } setdata(t, e) { let s = !1; if (/^@/.test(e)) { const [, i, o] = /^@(.*?)\.(.*?)$/.exec(e), r = this.getval(i), a = i ? "null" === r ? null : r || "{}" : "{}"; try { const e = JSON.parse(a); this.lodash_set(e, o, t), s = this.setval(JSON.stringify(e), i) } catch (e) { const r = {}; this.lodash_set(r, o, t), s = this.setval(JSON.stringify(r), i) } } else s = this.setval(t, e); return s } getval(t) { switch (this.getEnv()) { case "Surge": case "Loon": case "Stash": case "Shadowrocket": return $persistentStore.read(t); case "Quantumult X": return $prefs.valueForKey(t); case "Node.js": return this.data = this.loaddata(), this.data[t]; default: return this.data && this.data[t] || null } } setval(t, e) { switch (this.getEnv()) { case "Surge": case "Loon": case "Stash": case "Shadowrocket": return $persistentStore.write(t, e); case "Quantumult X": return $prefs.setValueForKey(t, e); case "Node.js": return this.data = this.loaddata(), this.data[e] = t, this.writedata(), !0; default: return this.data && this.data[e] || null } } initGotEnv(t) { this.got = this.got ? this.got : require("got"), this.cktough = this.cktough ? this.cktough : require("tough-cookie"), this.ckjar = this.ckjar ? this.ckjar : new this.cktough.CookieJar, t && (t.headers = t.headers ? t.headers : {}, t && (t.headers = t.headers ? t.headers : {}, void 0 === t.headers.cookie && void 0 === t.headers.Cookie && void 0 === t.cookieJar && (t.cookieJar = this.ckjar))) } get(t, e = (() => { })) { switch (t.headers && (delete t.headers["Content-Type"], delete t.headers["Content-Length"], delete t.headers["content-type"], delete t.headers["content-length"]), t.params && (t.url += "?" + this.queryStr(t.params)), void 0 === t.followRedirect || t.followRedirect || ((this.isSurge() || this.isLoon()) && (t["auto-redirect"] = !1), this.isQuanX() && (t.opts ? t.opts.redirection = !1 : t.opts = { redirection: !1 })), this.getEnv()) { case "Surge": case "Loon": case "Stash": case "Shadowrocket": default: this.isSurge() && this.isNeedRewrite && (t.headers = t.headers || {}, Object.assign(t.headers, { "X-Surge-Skip-Scripting": !1 })), $httpClient.get(t, ((t, s, i ) => { !t && s && (s.body = i, s.statusCode = s.status ? s.status : s.statusCode, s.status = s.statusCode), e(t, s, i) })); break; case "Quantumult X": this.isNeedRewrite && (t.opts = t.opts || {}, Object.assign(t.opts, { hints: !1 })), $task.fetch(t).then((t => { const { statusCode: s, statusCode: i, headers: o, body: r, bodyBytes: a } = t; e(null, { status: s, statusCode: i, headers: o, body: r, bodyBytes: a }, r, a) }), (t => e(t && t.error || "UndefinedError"))); break; case "Node.js": let s = require("iconv-lite"); this.initGotEnv(t), this.got(t).on("redirect", ((t, e) => { try { if (t.headers["set-cookie"]) { const s = t.headers["set-cookie"].map(this.cktough.Cookie.parse).toString(); s && this.ckjar.setCookieSync(s, null), e.cookieJar = this.ckjar } } catch (t) { this.logErr(t) } })).then((t => { const { statusCode: i, statusCode: o, headers: r, rawBody: a } = t, n = s.decode(a, this.encoding); e(null, { status: i, statusCode: o, headers: r, rawBody: a, body: n }, n) }), (t => { const { message: i, response: o } = t; e(i, o, o && s.decode(o.rawBody, this.encoding)) })); break } } post(t, e = (() => { })) { const s = t.method ? t.method.toLocaleLowerCase() : "post"; switch (t.body && t.headers && !t.headers["Content-Type"] && !t.headers["content-type"] && (t.headers["content-type"] = "application/x-www-form-urlencoded"), t.headers && (delete t.headers["Content-Length"], delete t.headers["content-length"]), void 0 === t.followRedirect || t.followRedirect || ((this.isSurge() || this.isLoon()) && (t["auto-redirect"] = !1), this.isQuanX() && (t.opts ? t.opts.redirection = !1 : t.opts = { redirection: !1 })), this.getEnv()) { case "Surge": case "Loon": case "Stash": case "Shadowrocket": default: this.isSurge() && this.isNeedRewrite && (t.headers = t.headers || {}, Object.assign(t.headers, { "X-Surge-Skip-Scripting": !1 })), $httpClient[s](t, ((t, s, i ) => { !t && s && (s.body = i, s.statusCode = s.status ? s.status : s.statusCode, s.status = s.statusCode), e(t, s, i) })); break; case "Quantumult X": t.method = s, this.isNeedRewrite && (t.opts = t.opts || {}, Object.assign(t.opts, { hints: !1 })), $task.fetch(t).then((t => { const { statusCode: s, statusCode: i, headers: o, body: r, bodyBytes: a } = t; e(null, { status: s, statusCode: i, headers: o, body: r, bodyBytes: a }, r, a) }), (t => e(t && t.error || "UndefinedError"))); break; case "Node.js": let i = require("iconv-lite"); this.initGotEnv(t); const { url: o, ...r } = t; this.got[s](o, r).then((t => { const { statusCode: s, statusCode: o, headers: r, rawBody: a } = t, n = i.decode(a, this.encoding); e(null, { status: s, statusCode: o, headers: r, rawBody: a, body: n }, n) }), (t => { const { message: s, response: o } = t; e(s, o, o && i.decode(o.rawBody, this.encoding)) })); break } } time(t, e = null) { const s = e ? new Date(e) : new Date; let i = { "M+": s.getMonth() + 1, "d+": s.getDate(), "H+": s.getHours(), "m+": s.getMinutes(), "s+": s.getSeconds(), "q+": Math.floor((s.getMonth() + 3) / 3), S: s.getMilliseconds() }; /(y+)/.test(t) && (t = t.replace(RegExp.$1, (s.getFullYear() + "").substr(4 - RegExp.$1.length))); for (let e in i) new RegExp("(" + e + ")").test(t) && (t = t.replace(RegExp.$1, 1 == RegExp.$1.length ? i[e] : ("00" + i[e]).substr(("" + i[e]).length))); return t } queryStr(t) { let e = ""; for (const s in t) { let i = t[s]; null != i && "" !== i && ("object" == typeof i && (i = JSON.stringify(i)), e += `${s}=${i}&`) } return e = e.substring(0, e.length - 1), e } msg(e = t, s = "", i = "", o = {}) { const r = t => { const { $open: e, $copy: s, $media: i, $mediaMime: o } = t; switch (typeof t) { case void 0: return t; case "string": switch (this.getEnv()) { case "Surge": case "Stash": default: return { url: t }; case "Loon": case "Shadowrocket": return t; case "Quantumult X": return { "open-url": t }; case "Node.js": return }case "object": switch (this.getEnv()) { case "Surge": case "Stash": case "Shadowrocket": default: { const r = {}; let a = t.openUrl || t.url || t["open-url"] || e; a && Object.assign(r, { action: "open-url", url: a }); let n = t["update-pasteboard"] || t.updatePasteboard || s; if (n && Object.assign(r, { action: "clipboard", text: n }), i) { let t, e, s; if (i.startsWith("http" )) t = i; else if (i.startsWith("data:")) { const [t] = i.split(";"), [, o] = i.split(","); e = o, s = t.replace("data:", "") } else { e = i, s = (t => { const e = { JVBERi0: "application/pdf", R0lGODdh: "image/gif", R0lGODlh: "image/gif", iVBORw0KGgo: "image/png", "/9j/": "image/jpg" }; for (var s in e) if (0 === t.indexOf(s)) return e[s]; return null })(i) } Object.assign(r, { "media-url": t, "media-base64": e, "media-base64-mime": o ?? s }) } return Object.assign(r, { "auto-dismiss": t["auto-dismiss"], sound: t.sound }), r } case "Loon": { const s = {}; let o = t.openUrl || t.url || t["open-url"] || e; o && Object.assign(s, { openUrl: o }); let r = t.mediaUrl || t["media-url"]; return i?.startsWith("http" ) && (r = i), r && Object.assign(s, { mediaUrl: r }), console.log(JSON.stringify(s)), s } case "Quantumult X": { const o = {}; let r = t["open-url"] || t.url || t.openUrl || e; r && Object.assign(o, { "open-url": r }); let a = t["media-url"] || t.mediaUrl; i?.startsWith("http" ) && (a = i), a && Object.assign(o, { "media-url": a }); let n = t["update-pasteboard"] || t.updatePasteboard || s; return n && Object.assign(o, { "update-pasteboard": n }), console.log(JSON.stringify(o)), o } case "Node.js": return }default: return } }; if (!this.isMute) switch (this.getEnv()) { case "Surge": case "Loon": case "Stash": case "Shadowrocket": default: $notification.post(e, s, i, r(o)); break; case "Quantumult X": $notify(e, s, i, r(o)); break; case "Node.js": break }if (!this.isMuteLog) { let t = ["", "==============📣系统通知📣=============="]; t.push(e), s && t.push(s), i && t.push(i), console.log(t.join("\n")), this.logs = this.logs.concat(t) } } debug(...t) { this.logLevels[this.logLevel] <= this.logLevels.debug && (t.length > 0 && (this.logs = [...this.logs, ...t]), console.log(`${this.logLevelPrefixs.debug}${t.map((t => t ?? String(t))).join(this.logSeparator)}`)) } info(...t) { this.logLevels[this.logLevel] <= this.logLevels.info && (t.length > 0 && (this.logs = [...this.logs, ...t]), console.log(`${this.logLevelPrefixs.info}${t.map((t => t ?? String(t))).join(this.logSeparator)}`)) } warn(...t) { this.logLevels[this.logLevel] <= this.logLevels.warn && (t.length > 0 && (this.logs = [...this.logs, ...t]), console.log(`${this.logLevelPrefixs.warn}${t.map((t => t ?? String(t))).join(this.logSeparator)}`)) } error(...t) { this.logLevels[this.logLevel] <= this.logLevels.error && (t.length > 0 && (this.logs = [...this.logs, ...t]), console.log(`${this.logLevelPrefixs.error}${t.map((t => t ?? String(t))).join(this.logSeparator)}`)) } log(...t) { t.length > 0 && (this.logs = [...this.logs, ...t]), console.log(t.map((t => t ?? String(t))).join(this.logSeparator)) } logErr(t, e) { switch (this.getEnv()) { case "Surge": case "Loon": case "Stash": case "Shadowrocket": case "Quantumult X": default: this.log("", `❗️${this.name}, 错误!`, e, t); break; case "Node.js": this.log("", `❗️${this.name}, 错误!`, e, void 0 !== t.message ? t.message : t, t.stack); break } } wait(t) { return new Promise((e => setTimeout(e, t))) } done(t = {}) { const e = ((new Date).getTime() - this.startTime) / 1e3; switch (this.log("", `🔔${this.name}, 结束! 🕛 ${e} 秒`), this.log(), this.getEnv()) { case "Surge": case "Loon": case "Stash": case "Shadowrocket": case "Quantumult X": default: $done(t); break; case "Node.js": process.exit(1) } } }(t, e) }
+  });
+})();
