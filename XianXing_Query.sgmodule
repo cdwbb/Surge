@@ -1,16 +1,17 @@
-#!name=成都限行查询（交管局官方规则）
-#!desc=抓取成都市公安局官方通告的常态尾号规则，按星期生成今日和明日限行信息；法定节假日及临时管控需另查官方公告。
+#!name=成都限行查询（已失效）
+#!desc=已停用：目前没有可稳定使用的成都交警官方实时限行数据源。面板和定时通知均已禁用，请勿依赖本模块判断今日限行。
 #!author=GitHubWBB / 修复版
 #!icon=https://raw.githubusercontent.com/GitHubWBB/Loon/main/js/traffic_limit_icon_v2.png
-#!arguments=city:cd,loo:本地车,cartype:燃油车,cronexp:30 7 * * *
-#!arguments-desc=city: 成都填 cd（此数据源仅支持成都）\nloo: 本地车或外地车\ncartype: 车辆类型（默认燃油车）\ncronexp: 定时通知 CRON 表达式（默认每天 7:30）
 
-[Panel]
-车辆限行 = script-name=xianxing-panel, update-interval=3600
+# 失效说明：官网目前仅有静态政策及交通公告，未发现公开实时限行 API。
+# 官方通告栏目：https://cdgaj.chengdu.gov.cn/cdsgaj/jgxx/news_gkgs1615379688854.shtml
+# 找到稳定、可验证的数据源后，再恢复下方配置。
 
-[Script]
-# 面板模式：只返回面板数据，不发送系统通知
-xianxing-panel = type=generic, script-path=https://raw.githubusercontent.com/GitHubWBB/Surge/main/js/XianXing_Query.js, argument=city={{{city}}}&loo={{{loo}}}&cartype={{{cartype}}}&mode=panel
+# [Panel]
+# 车辆限行 = script-name=xianxing-panel, update-interval=3600
 
-# 通知模式：只在 CRON 触发时发送通知，不更新面板
-xianxing-cron = type=cron, cronexp={{{cronexp}}}, script-path=https://raw.githubusercontent.com/GitHubWBB/Surge/main/js/XianXing_Query.js, argument=city={{{city}}}&loo={{{loo}}}&cartype={{{cartype}}}&mode=notify
+# [Script]
+# 面板脚本（已停用）
+# xianxing-panel = type=generic, script-path=https://raw.githubusercontent.com/GitHubWBB/Surge/main/js/XianXing_Query.js, argument=city={{{city}}}&loo={{{loo}}}&cartype={{{cartype}}}&mode=panel
+# 定时通知脚本（已停用）
+# xianxing-cron = type=cron, cronexp={{{cronexp}}}, script-path=https://raw.githubusercontent.com/GitHubWBB/Surge/main/js/XianXing_Query.js, argument=city={{{city}}}&loo={{{loo}}}&cartype={{{cartype}}}&mode=notify
