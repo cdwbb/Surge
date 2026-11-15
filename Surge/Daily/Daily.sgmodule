@@ -1,0 +1,25 @@
+#!name=成都每日信息中心
+#!desc=五个独立面板：成都天气、日期与节假日、空气质量、网络健康、四川油价。通知由独立 Cron 脚本运行。
+#!author=cdwbb
+#!system=ios
+#!category=生活
+#!arguments=天气刷新:1800,日历刷新:21600,空气刷新:1800,网络刷新:300,油价刷新:21600,天气通知:0,空气通知:0,油价通知:0,通知时间:0 8 * * *
+#!arguments-desc=五个刷新参数单位为秒；天气通知/空气通知/油价通知：0 关闭、1 开启；通知时间：五段 Cron 表达式，默认每天 08:00。
+
+[Panel]
+成都天气 = script-name=cd-daily-weather, update-interval={{{天气刷新}}}
+日期与节假日 = script-name=cd-daily-calendar, update-interval={{{日历刷新}}}
+成都空气质量 = script-name=cd-daily-air, update-interval={{{空气刷新}}}
+网络健康 = script-name=cd-daily-network, update-interval={{{网络刷新}}}
+四川油价 = script-name=cd-daily-oil, update-interval={{{油价刷新}}}
+
+[Script]
+cd-daily-weather = type=generic, script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/Surge/Daily/js/Weather_Panel.js, timeout=20
+cd-daily-calendar = type=generic, script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/Surge/Daily/js/Calendar_Panel.js, timeout=15
+cd-daily-air = type=generic, script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/Surge/Daily/js/Air_Panel.js, timeout=20
+cd-daily-network = type=generic, script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/Surge/Daily/js/Network_Panel.js, timeout=20
+cd-daily-oil = type=generic, script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/Surge/Daily/js/Oil_Panel.js, timeout=12
+
+cd-weather-notify = type=cron, cronexp="{{{通知时间}}}", script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/Surge/Daily/js/Weather_Notify.js, wake-system=1, timeout=20, argument=enabled={{{天气通知}}}
+cd-air-notify = type=cron, cronexp="{{{通知时间}}}", script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/Surge/Daily/js/Air_Notify.js, wake-system=1, timeout=20, argument=enabled={{{空气通知}}}
+cd-oil-notify = type=cron, cronexp="{{{通知时间}}}", script-path=https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/Surge/Daily/js/Oil_Notify.js, wake-system=1, timeout=15, argument=enabled={{{油价通知}}}

@@ -1,0 +1,42 @@
+{
+  "city": {
+    "name": "成都",
+    "code": "CD",
+    "latitude": 30.5728,
+    "longitude": 104.0668,
+    "timezone": "Asia/Shanghai"
+  },
+  "weather": {
+    "forecastDays": 5,
+    "cacheKey": "cd_daily_weather_v1",
+    "notifyColdCelsius": 5,
+    "notifyHotCelsius": 35
+  },
+  "air": {
+    "cacheKey": "cd_daily_air_v1",
+    "notifyUsAqiAbove": 100
+  },
+  "network": {
+    "cacheKey": "cd_daily_network_v1",
+    "timeoutSeconds": 8,
+    "targets": [
+      {"name": "Google 连通性检测", "url": "https://connectivitycheck.gstatic.com/generate_204"},
+      {"name": "Apple 连通性检测", "url": "https://www.apple.com/library/test/success.html"}
+    ]
+  },
+  "oil": {
+    "cacheKey": "cd_daily_oil_v1",
+    "status": "unavailable",
+    "effectiveDate": "",
+    "sourceName": "四川省发展和改革委员会 / 国家发展改革委",
+    "sourceUrl": "https://fgw.sc.gov.cn/",
+    "prices": null,
+    "forecastDate": null,
+    "forecastNote": "不提供未经官方公告确认的调价预测"
+  },
+  "notice": {
+    "weatherCacheKey": "cd_daily_weather_notice_v1",
+    "airCacheKey": "cd_daily_air_notice_v1",
+    "oilCacheKey": "cd_daily_oil_notice_v1"
+  }
+}
