@@ -1,30 +1,20 @@
 (function () {
-  var URL = "https://raw.githubusercontent.com/cdwbb/Surge/surge-daily-v1/Surge/Daily/config/settings.json";
-  function show(cfg, stale) {
-    var o = cfg.oil || {}, lines = [];
-    if (o.status === "official" && o.prices && o.effectiveDate) {
-      lines.push("执行日期：" + o.effectiveDate);
-      lines.push("92号汽油：" + (o.prices.gasoline92 == null ? "—" : "¥" + o.prices.gasoline92 + "/L"));
-      lines.push("95号汽油：" + (o.prices.gasoline95 == null ? "—" : "¥" + o.prices.gasoline95 + "/L"));
-      lines.push("0号柴油：" + (o.prices.diesel0 == null ? "—" : "¥" + o.prices.diesel0 + "/L"));
-      lines.push("数据来源：" + (o.sourceName || "官方公告"));
-      if (o.sourceUrl) lines.push("公告：" + o.sourceUrl);
-      if (o.forecastDate) lines.push("预计调价日期（预测）：" + o.forecastDate);
-      if (stale) lines.push("⚠️ 配置文件获取失败，显示上次缓存；请核对公告。");
-      $done({ title: "四川油价", content: lines.join("\n"), icon: "fuelpump.fill", "icon-color": "#F5A623" }); return;
-    }
-    lines.push("暂无可靠官方数据");
-    lines.push("本面板不显示第三方页面抓取或过期价格。");
-    lines.push("数据来源：四川省发展改革委 / 国家发展改革委");
-    lines.push("上次检查：" + new Date().toLocaleString());
-    lines.push("如需补录价格，请在 settings.json 中填写官方公告价格、执行日期及公告链接。");
-    if (stale) lines.push("⚠️ 当前无法连接配置源。");
-    $done({ title: "四川油价", content: lines.join("\n"), icon: "fuelpump.fill", "icon-color": "#F5A623" });
+  function args() { var out = {}, pairs = String($argument || "").split("&"); for (var i = 0; i < pairs.length; i++) { var at = pairs[i].indexOf("="); if (at < 0) continue; var value = pairs[i].slice(at + 1); try { value = decodeURIComponent(value); } catch (ignore) {} out[pairs[i].slice(0, at)] = value; } return out; }
+  function price(a, key) { var n = Number(a[key]); return isFinite(n) && n > 0 && n < 30 ? n : null; }
+  function validDate(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return false;
+    var parts = value.split("-"), date = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
+    return date.getUTCFullYear() === Number(parts[0]) && date.getUTCMonth() === Number(parts[1]) - 1 && date.getUTCDate() === Number(parts[2]);
   }
-  $httpClient.get({ url: URL, timeout: 8, headers: { "Accept": "application/json" } }, function (e, r, b) {
-    if (!e && r && r.status >= 200 && r.status < 300) { try { var cfg = JSON.parse(b); $persistentStore.write(JSON.stringify(cfg.oil || {}), "cd_daily_oil_v1"); show(cfg, false); return; } catch (ignore) {} }
-    var saved = $persistentStore.read("cd_daily_oil_v1");
-    if (saved) { try { show({ oil: JSON.parse(saved) }, true); return; } catch (ignore2) {} }
-    show({ oil: { status: "unavailable" } }, true);
-  });
+  function officialSource(url) { return /^https:\/\/(?:fgw\.sc\.gov\.cn|(?:[a-z0-9-]+\.)*ndrc\.gov\.cn)(?:[/:?#]|$)/i.test(url || ""); }
+  var a = args(), prices = { gasoline92: price(a, "oil_92"), gasoline95: price(a, "oil_95"), diesel0: price(a, "oil_diesel") };
+  var sourceUrl = a.oil_source_url === "none" ? "" : (a.oil_source_url || "");
+  var complete = validDate(a.oil_date) && prices.gasoline92 && prices.gasoline95 && prices.diesel0 && officialSource(sourceUrl);
+  if (!complete) {
+    $done({ title: "四川油价", content: "暂无可靠官方数据\n仅填写可核验的官方公告数据后显示价格。\nModule 参数需包含执行日期、92/95 号汽油、0 号柴油及四川省发改委或国家发改委公告链接。\n查询时间：" + new Date().toLocaleString(), icon: "fuelpump.fill", "icon-color": "#F5A623" });
+    return;
+  }
+  var lines = ["执行日期：" + a.oil_date, "92号汽油：¥" + prices.gasoline92.toFixed(2) + "/L", "95号汽油：¥" + prices.gasoline95.toFixed(2) + "/L", "0号柴油：¥" + prices.diesel0.toFixed(2) + "/L", "数据来源：四川省发展改革委 / 国家发展改革委官方公告", "公告链接：" + sourceUrl, "参数读取时间：" + new Date().toLocaleString()];
+  if (validDate(a.oil_forecast_date) && a.oil_forecast_date !== "none") lines.push("预计调价日期（预测，非官方确认）：" + a.oil_forecast_date);
+  $done({ title: "四川油价", content: lines.join("\n"), icon: "fuelpump.fill", "icon-color": "#F5A623" });
 }());
